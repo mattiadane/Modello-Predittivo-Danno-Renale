@@ -1,8 +1,9 @@
-import select
 import streamlit as st
 
-if "nephro" not in st.session_state:
-    st.session_state.nephro = []
+if "state" not in st.session_state:
+    st.session_state.state = {
+        "surgical_op": False
+    }
 
 # funzione per aprire il file css
 def local_css(file_name):
@@ -12,8 +13,11 @@ def local_css(file_name):
 # Richiama la funzione passando il nome del file
 local_css("front-end/style/style.css")
 
+st.set_page_config(page_title="Kidney Injury", page_icon="🧬")
 
-st.title("Predizione Danno Renale")
+
+
+st.title("Prediction of Kidney Injury")
 
 
 button_nephro = st.button("Nephrotoxicity drugs")
@@ -22,7 +26,6 @@ button_nephro = st.button("Nephrotoxicity drugs")
 
 if button_nephro:
     st.write("Nephrotoxicity drugs")
-    st.session_state.nephro.append("Gentamicin")
     # richiamare query per selezionare farmaci nefrotossici
 
 button_sepsi = st.button("Sepsi")
@@ -49,7 +52,7 @@ if button_conmed:
 check_surgical_op = st.checkbox("surgical operation")
 if check_surgical_op:
     st.write("Surgical operation is clicked")
-    # richiamare query per selezionare operazioni
+    st.session_state.state["surgical_op"] = True
 
 
 min_sis_pres= st.slider("Select min value ",50,160)
@@ -68,6 +71,13 @@ button_opendialog = st.button("Choose Framework")
 
 @st.dialog("Select framework")
 def select_framework():
+    messaa = " Hai selezionato surgical op?"
+    if st.session_state.state["surgical_op"]:
+        messaa += " Si"
+    else :
+        messaa += " No"
+
+    st.write(messaa)
 
     choice = st.radio(
         "Seleziona un'framework:",
@@ -78,9 +88,7 @@ def select_framework():
 
     if button_submit:
 
-        st.write("hai selezionato " + choice)
-        st.write(st.session_state.nephro[0])
-
+        st.write("hai selezionato " + choice )
 
 
 if button_opendialog:
