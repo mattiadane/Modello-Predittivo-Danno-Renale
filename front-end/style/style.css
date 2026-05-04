@@ -7,5 +7,22 @@ header {
 
 footer {
     visibility: hidden;
-
 }
+
+.stApp {
+    background: linear-gradient(
+        to bottom,
+        #ffffff,   /* bianco */
+        #d4f5e9    /* verde chiaro */
+    );
+}
+
+body, p, span, label, div {
+    color: #000000;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #000000;
+}
+
+

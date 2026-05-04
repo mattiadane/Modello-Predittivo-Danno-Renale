@@ -14,7 +14,7 @@ if "state" not in st.session_state:
 
 # funzione per aprire il file css
 def local_css(file_name):
-    with open(file_name) as f:
+    with open(file_name, encoding="utf-8") as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 # Richiama la funzione passando il nome del file
