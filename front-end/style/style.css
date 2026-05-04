@@ -25,4 +25,19 @@ h1, h2, h3, h4, h5, h6 {
     color: #000000;
 }
 
+.stButton button {
+    background-color: #ffffff;   /* bianco */
+    color: #000000;              /* testo nero */
+    border: 2px solid #2e7d32;   /* bordo verde */
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
 
+/* Effetto hover */
+.stButton button:hover {
+    background-color: #e8f5e9;   /* verde molto chiaro */
+    border-color: #1b5e20;
+    transform: translateY(-1px);
+}
