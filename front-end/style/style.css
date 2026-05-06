@@ -12,23 +12,52 @@ footer {
 .stApp {
     background: linear-gradient(
         to bottom,
-        #ffffff,   /* bianco */
-        #d4f5e9    /* verde chiaro */
+        yellow,
+        orange;
     );
 }
 
-body, p, span, label, div {
-    color: #000000;
+
+span {
+    color: white;
+}
+
+p {
+    color: white;
+}
+
+label, div, body {
+    color: #e8f5e9;
 }
 
 h1, h2, h3, h4, h5, h6 {
     color: #000000;
 }
 
+div[data-baseweb="tooltip"] {
+    background-color: #111;
+    color: #111111;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+div[data-baseweb="slider"] div[role="slider"] {
+    width: 18px;
+    height: 18px;
+    background: white;
+    border: 2px solid #ff5252;
+    box-shadow: 0 0 6px rgba(255, 82, 82, 0.6);
+}
+
+div[data-baseweb="slider"] div[role="slider"]:hover {
+    transform: scale(1.25);
+    transition: 0.15s ease-in-out;
+}
+
 .stButton button {
-    background-color: #ffffff;   /* bianco */
+    background-color: orange;   /* bianco */
     color: #000000;              /* testo nero */
-    border: 2px solid #2e7d32;   /* bordo verde */
+    border: 2px solid red;   /* bordo verde */
     border-radius: 10px;
     padding: 10px 18px;
     font-weight: 600;
@@ -37,7 +66,54 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Effetto hover */
 .stButton button:hover {
-    background-color: #e8f5e9;   /* verde molto chiaro */
-    border-color: #1b5e20;
+    background-color: #ff8c00;   /* verde molto chiaro */
+    border-color: red;
     transform: translateY(-1px);
+}
+
+/* Selettore universale per i container con bordo di Streamlit */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-left: 2px solid #4E4E4E !important; /* Bordo scuro e visibile */
+    border-right: 2px solid #4E4E4E !important;
+    border-top: 2px solid #4E4E4E !important;
+    border-bottom: 2px solid #4E4E4E !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    background-color: #f9f9f9 !important; /* Sfondo leggermente diverso per staccare */
+    margin-bottom: 20px !important;
+}
+
+/* Stile del titolo dentro il box */
+h3 {
+    margin-top: 0px !important;
+    color: #111;
+    font-weight: bold;
+    border-bottom: 3px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 15px !important;
+}
+
+/* Rimuove lo spazio eccessivo tra le checkbox interne */
+[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {
+    gap: 0.5rem !important;
+}
+
+/* Rimuove eventuali bordi extra dalle checkbox singole */
+[data-testid="stCheckbox"] {
+    border: none !important;
+    background-color: transparent !important;
+}
+
+div[data-testid="stDialog"] > div {
+    background-color: #e8f5e9 !important;
+    border-radius: 16px;
+    padding: 20px;
+}
+
+div[data-testid="stDialog"]::before {
+    background-color: #e8f5e9 !important;
+}
+
+div[data-testid="stDialog"] {
+    color: white;
 }
