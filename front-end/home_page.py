@@ -1,4 +1,5 @@
 import streamlit as st
+from vocabolario import *
 
 st.set_page_config(page_title="Kidney Injury", page_icon="🧬")
 
@@ -62,6 +63,21 @@ st.write("")
 check_surgical_op = st.checkbox("Surgical Operation")
 if check_surgical_op:
     st.session_state.state["surgical_op"] = True
+
+
+
+
+###################################
+
+
+# Dropdown con autocompletamento
+scelta = st.multiselect(
+    "Scegli un termine:",
+    CHARTEVENTS
+)
+
+####################################
+
 
 button_opendialog = st.button("Choose Framework")
 
