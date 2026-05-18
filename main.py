@@ -7,7 +7,7 @@ class Application :
         pass
 
     def start_frontend(self):
-        subprocess.run(["streamlit", "run", "front-end/home_page.py"])
+        subprocess.run(["streamlit", "run", "frontend/app.py"])
 
     def run(self):
         self.start_frontend()

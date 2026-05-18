@@ -1,34 +1,35 @@
 import streamlit as st
-
 from database.connection import Connection
-from vocabolario import *
+from frontend.vocabolario import *
 
-st.set_page_config(page_title="Kidney Injury", page_icon="🧬")
+@st.cache_resource
+def get_database_connection():
+    return Connection()
 
+con = get_database_connection()
 
-con = Connection()
-
-
-if con :
-    print("Connected")
 
 
 if "state" not in st.session_state:
     st.session_state.state = {
         "nephro": False,
-        "spesi": False,
+        "sepsi": False, 
         "diuretic": False,
         "venpres": None,
         "conmed": False,
         "surgical_op": False,
         "sispress": None,
         "antihypertensive": False,
+        "example" : None
     }
 
 def local_css(file_name):
-    with open(file_name, encoding="utf-8") as f:
-        st.markdown("<style>" + file_name + "</style>", unsafe_allow_html=True)
-local_css("front-end/style/style.css")
+    try:
+        with open(file_name, encoding="utf-8") as f:
+            st.markdown("<style>" + f.read() + "</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        pass
+local_css("frontend/style/style.css")
 
 st.title("Prediction of Kidney Injury")
 
@@ -79,21 +80,15 @@ with st.container(border=True):
             st.session_state.state["surgical_op"] = False
 
 # ===== MULTISELECT =====
-scelta = st.multiselect(
-    "Scegli un termine:",
-    CHARTEVENTS
-)
+scelta = st.multiselect("Scegli un termine:", CHARTEVENTS)
 
 # ===== BOTTONE CENTRATO =====
 st.write("")
 col_l, col_c, col_r = st.columns([1, 1, 1])
 with col_c:
     button_opendialog = st.button("Choose Framework", use_container_width=True)
-
-@st.dialog("Select framework")
-def select_framework():
-    st.write("Stato corrente:", st.session_state.state)
-
-
-if button_opendialog:
-    select_framework()
+    if button_opendialog:
+        df = con.query("SELECT * FROM patients LIMIT 10")
+        if df is not None and not df.empty:
+            st.session_state.state["example"] = df
+        st.switch_page("pages/result.py")
