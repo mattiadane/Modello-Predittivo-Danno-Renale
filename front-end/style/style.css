@@ -1,119 +1,274 @@
-#MainMenu {
-    visibility: hidden;
-}
-header {
-    visibility: hidden;
+/* ============================================
+   KIDNEY INJURY APP — Medical Precision Theme
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+/* ── Root Variables ── */
+:root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c2330;
+    --border: #30363d;
+    --accent: #2f81f7;
+    --accent-dim: rgba(47, 129, 247, 0.12);
+    --accent-hover: #58a6ff;
+    --danger: #f85149;
+    --success: #3fb950;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #484f58;
+    --radius: 10px;
+    --radius-lg: 16px;
 }
 
-footer {
-    visibility: hidden;
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif !important;
+    background-color: var(--bg) !important;
+    color: var(--text-primary) !important;
 }
 
+/* ── App Container ── */
 .stApp {
-    background: linear-gradient(
-        to bottom,
-        yellow,
-        orange;
-    );
+    background-color: var(--bg) !important;
 }
 
-
-span {
-    color: white;
+.block-container {
+    padding: 2.5rem 2rem !important;
+    max-width: 960px !important;
+    margin: 0 auto !important;
 }
 
-p {
-    color: white;
+/* ── Title ── */
+h1 {
+    font-family: 'Space Mono', monospace !important;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 1rem !important;
+    margin-bottom: 2rem !important;
 }
 
-label, div, body {
-    color: #e8f5e9;
+h1::before {
+    content: "🧬 ";
 }
 
-h1, h2, h3, h4, h5, h6 {
-    color: #000000;
-}
-
-div[data-baseweb="tooltip"] {
-    background-color: #111;
-    color: #111111;
-    border-radius: 6px;
-    font-size: 12px;
-}
-
-div[data-baseweb="slider"] div[role="slider"] {
-    width: 18px;
-    height: 18px;
-    background: white;
-    border: 2px solid #ff5252;
-    box-shadow: 0 0 6px rgba(255, 82, 82, 0.6);
-}
-
-div[data-baseweb="slider"] div[role="slider"]:hover {
-    transform: scale(1.25);
-    transition: 0.15s ease-in-out;
-}
-
-.stButton button {
-    background-color: orange;   /* bianco */
-    color: #000000;              /* testo nero */
-    border: 2px solid red;   /* bordo verde */
-    border-radius: 10px;
-    padding: 10px 18px;
-    font-weight: 600;
-    transition: all 0.2s ease;
-}
-
-/* Effetto hover */
-.stButton button:hover {
-    background-color: #ff8c00;   /* verde molto chiaro */
-    border-color: red;
-    transform: translateY(-1px);
-}
-
-/* Selettore universale per i container con bordo di Streamlit */
-[data-testid="stVerticalBlockBorderWrapper"] {
-    border-left: 2px solid #4E4E4E !important; /* Bordo scuro e visibile */
-    border-right: 2px solid #4E4E4E !important;
-    border-top: 2px solid #4E4E4E !important;
-    border-bottom: 2px solid #4E4E4E !important;
-    border-radius: 12px !important;
-    padding: 20px !important;
-    background-color: #f9f9f9 !important; /* Sfondo leggermente diverso per staccare */
-    margin-bottom: 20px !important;
-}
-
-/* Stile del titolo dentro il box */
+/* ── Section Headings ── */
 h3 {
-    margin-top: 0px !important;
-    color: #111;
-    font-weight: bold;
-    border-bottom: 3px solid #ddd;
-    padding-bottom: 10px;
-    margin-bottom: 15px !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--accent) !important;
+    margin-bottom: 1.2rem !important;
 }
 
-/* Rimuove lo spazio eccessivo tra le checkbox interne */
-[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {
-    gap: 0.5rem !important;
+/* ── Containers (border=True) ── */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
-/* Rimuove eventuali bordi extra dalle checkbox singole */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:hover {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 1px var(--accent-dim), 0 4px 24px rgba(0,0,0,0.3) !important;
+}
+
+/* ── 3-Column Grid per i container ── */
+/* Farmaci: 3 checkbox affiancati */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(1)
+> div[data-testid="stVerticalBlock"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.75rem !important;
+}
+
+/* Pressioni: 2 checkbox affiancati */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(2)
+> div[data-testid="stVerticalBlock"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+}
+
+/* ── Checkboxes singoli (Sepsi, Contrast, Surgical) in griglia 3 col ── */
+.stCheckbox-standalone-group {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.75rem !important;
+    margin: 1rem 0 !important;
+}
+
+/* ── Checkbox Base ── */
 [data-testid="stCheckbox"] {
+    background-color: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 0.9rem 1rem !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+[data-testid="stCheckbox"]:hover {
+    border-color: var(--accent) !important;
+    background-color: var(--accent-dim) !important;
+}
+
+[data-testid="stCheckbox"] label {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer !important;
+    transition: color 0.2s ease !important;
+}
+
+[data-testid="stCheckbox"]:hover label {
+    color: var(--text-primary) !important;
+}
+
+/* Checkbox tick */
+[data-testid="stCheckbox"] input[type="checkbox"] + label::before,
+[data-testid="stCheckbox"] input[type="checkbox"]:checked + label {
+    color: var(--accent-hover) !important;
+}
+
+/* ── Multiselect ── */
+[data-testid="stMultiSelect"] {
+    margin: 1.5rem 0 !important;
+}
+
+[data-testid="stMultiSelect"] > div > div {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    color: var(--text-primary) !important;
+    transition: border-color 0.2s ease !important;
+}
+
+[data-testid="stMultiSelect"] > div > div:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-dim) !important;
+}
+
+[data-testid="stMultiSelect"] label {
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: var(--text-secondary) !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Tag multiselect */
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background-color: var(--accent-dim) !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent-hover) !important;
+    border-radius: 6px !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+}
+
+/* ── Button ── */
+[data-testid="stButton"] {
+    display: flex !important;
+    justify-content: center !important;
+    margin-top: 2rem !important;
+}
+
+[data-testid="stButton"] button {
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    background-color: var(--accent) !important;
+    color: #fff !important;
     border: none !important;
-    background-color: transparent !important;
+    border-radius: var(--radius) !important;
+    padding: 0.75rem 2.5rem !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease !important;
+    box-shadow: 0 0 0 0 transparent !important;
+    min-width: 200px !important;
 }
 
-div[data-testid="stDialog"] > div {
-    background-color: #e8f5e9 !important;
-    border-radius: 16px;
-    padding: 20px;
+[data-testid="stButton"] button:hover {
+    background-color: var(--accent-hover) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(47, 129, 247, 0.35) !important;
 }
 
-div[data-testid="stDialog"]::before {
-    background-color: #e8f5e9 !important;
+[data-testid="stButton"] button:active {
+    transform: translateY(0) !important;
+    box-shadow: none !important;
 }
 
-div[data-testid="stDialog"] {
-    color: white;
+/* ── Dialog / Modal ── */
+[data-testid="stDialog"] > div {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6) !important;
+}
+
+[data-testid="stDialog"] h2 {
+    font-family: 'Space Mono', monospace !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.05em !important;
+    color: var(--text-primary) !important;
+}
+
+/* Radio nel dialog */
+[data-testid="stDialog"] [data-testid="stRadio"] label {
+    background-color: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.85rem !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stDialog"] [data-testid="stRadio"] label:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent-hover) !important;
+}
+
+/* ── Divider & Spacing ── */
+hr {
+    border-color: var(--border) !important;
+    margin: 1.5rem 0 !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(1)
+    > div[data-testid="stVerticalBlock"] {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(2)
+    > div[data-testid="stVerticalBlock"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 480px) {
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(1)
+    > div[data-testid="stVerticalBlock"] {
+        grid-template-columns: 1fr !important;
+    }
 }

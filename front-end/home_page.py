@@ -1,99 +1,99 @@
 import streamlit as st
+
+from database.connection import Connection
 from vocabolario import *
 
 st.set_page_config(page_title="Kidney Injury", page_icon="🧬")
 
+
+con = Connection()
+
+
+if con :
+    print("Connected")
+
+
 if "state" not in st.session_state:
     st.session_state.state = {
-        "nephro" : False,
+        "nephro": False,
         "spesi": False,
-        "diuretic" : False,
-        "venpres" : None,
+        "diuretic": False,
+        "venpres": None,
         "conmed": False,
         "surgical_op": False,
-        "sispress" : None,
-        "antihypertensive" : False,
+        "sispress": None,
+        "antihypertensive": False,
     }
 
-# funzione per aprire il file css
 def local_css(file_name):
     with open(file_name, encoding="utf-8") as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-# Richiama la funzione passando il nome del file
+        st.markdown("<style>" + file_name + "</style>", unsafe_allow_html=True)
 local_css("front-end/style/style.css")
 
 st.title("Prediction of Kidney Injury")
 
-# ===== FARMACI =====
+# ===== FARMACI — 3 colonne =====
 with st.container(border=True):
     st.markdown("### Farmaci")
-    st.session_state.state["nephro"] = st.checkbox("Nephrotoxicity drugs")
-    st.session_state.state["diuretic"] = st.checkbox("Diuretic drugs")
-    st.session_state.state["antihypertensive"] = st.checkbox("Antihypertensive drugs")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.state["nephro"] = st.checkbox("Nephrotoxicity drugs")
+    with col2:
+        st.session_state.state["diuretic"] = st.checkbox("Diuretic drugs")
+    with col3:
+        st.session_state.state["antihypertensive"] = st.checkbox("Antihypertensive drugs")
 
-# ===== PRESSIONI =====
+# ===== PRESSIONI — 3 colonne =====
 with st.container(border=True):
     st.markdown("### Pressioni")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.checkbox("Enable venous pressure"):
+            st.session_state.state["venpres"] = True
+        else:
+            st.session_state.state["venpres"] = None
+    with col3:
+        if st.checkbox("Enable systolic pressure"):
+            st.session_state.state["sispress"] = True
+        else:
+            st.session_state.state["sispress"] = None
 
-    if st.checkbox("Enable venous pressure"):
-        st.session_state.state["venpres"] = st.slider("Venous pressure", -10, 20)
-    else:
-        st.session_state.state["venpres"] = None
+# ===== ALTRI FLAGS — 3 colonne =====
+with st.container(border=True):
+    st.markdown("### Condizioni")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.checkbox("Sepsi"):
+            st.session_state.state["sepsi"] = True
+        else:
+            st.session_state.state["sepsi"] = False
+    with col2:
+        if st.checkbox("Contrast Medium"):
+            st.session_state.state["conmed"] = True
+        else:
+            st.session_state.state["conmed"] = False
+    with col3:
+        if st.checkbox("Surgical Operation"):
+            st.session_state.state["surgical_op"] = True
+        else:
+            st.session_state.state["surgical_op"] = False
 
-    if st.checkbox("Enable systolic pressure"):
-        st.session_state.state["sispress"] = st.slider("Systolic pressure", 50, 160)
-    else:
-        st.session_state.state["sispress"] = None
-
-st.write("")
-
-check_sepsi = st.checkbox("Sepsi")
-if check_sepsi:
-    st.session_state.state["sepsi"] = True
-
-st.write("")
-
-check_conmed = st.checkbox("Contrast Medium")
-if check_conmed:
-    st.session_state.state["conmed"] = True
-
-st.write("")
-
-check_surgical_op = st.checkbox("Surgical Operation")
-if check_surgical_op:
-    st.session_state.state["surgical_op"] = True
-
-
-
-
-###################################
-
-
-# Dropdown con autocompletamento
+# ===== MULTISELECT =====
 scelta = st.multiselect(
     "Scegli un termine:",
     CHARTEVENTS
 )
 
-####################################
-
-
-button_opendialog = st.button("Choose Framework")
+# ===== BOTTONE CENTRATO =====
+st.write("")
+col_l, col_c, col_r = st.columns([1, 1, 1])
+with col_c:
+    button_opendialog = st.button("Choose Framework", use_container_width=True)
 
 @st.dialog("Select framework")
 def select_framework():
+    st.write("Stato corrente:", st.session_state.state)
 
-    st.write("hai selezionato  : ", st.session_state.state)
-    choice = st.radio(
-        "Seleziona un'framework:",
-        ["framework 1", "Framework 2"],
-        horizontal=True  # Per metterle affiancate come checkbox
-    )
-    button_submit = st.button("Submit")
-
-    if button_submit:
-        st.write("hai selezionato " + choice )
 
 if button_opendialog:
     select_framework()
