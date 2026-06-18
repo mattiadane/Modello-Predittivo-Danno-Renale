@@ -7,7 +7,26 @@ from database.connection import Connection
 class HomePage:
 
     def __init__(self):
-        # Path base del progetto
+        self.granularity_state = {}
+
+
+        self.PRESSURE_ITEMIDS = {
+            220179: "Non Invasive Blood Pressure systolic",
+            220050: "Arterial Blood Pressure systolic",
+            220074: "Central Venous Pressure",
+        }
+
+        self.GRANULARITY_OPTIONS = {
+            "15 minuti": "15min",
+            "30 minuti": "30min",
+            "1 ora": "1h",
+            "4 ore": "4h",
+            "1 giorno": "1d",
+        }
+
+        self.AGGREGATION_OPTIONS = ["Media", "Minimo", "Massimo"]
+
+
         self.inputevents_ids = None
         self.procedures_ids = None
         self.outputevents_ids = None
@@ -22,14 +41,6 @@ class HomePage:
         # Stato iniziale
         if "state" not in st.session_state:
             st.session_state.state = {
-                "nephro": False,
-                "sepsi": False,
-                "diuretic": False,
-                "venpres": None,
-                "conmed": False,
-                "surgical_op": False,
-                "sispress": None,
-                "antihypertensive": False,
                 "example": None
             }
 
@@ -64,31 +75,11 @@ class HomePage:
             st.markdown("### Farmaci")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.session_state.state["nephro"] = st.checkbox("Nephrotoxicity drugs")
+                st.checkbox("Nephrotoxicity drugs")
             with col2:
-                st.session_state.state["diuretic"] = st.checkbox("Diuretic drugs")
+                st.checkbox("Diuretic drugs")
             with col3:
-                st.session_state.state["antihypertensive"] = st.checkbox("Antihypertensive drugs")
-
-    def render_pressioni(self):
-        with st.container(border=True):
-            st.markdown("### Pressioni")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.session_state.state["venpres"] = st.checkbox("Enable venous pressure") or None
-            with col3:
-                st.session_state.state["sispress"] = st.checkbox("Enable systolic pressure") or None
-
-    def render_condizioni(self):
-        with st.container(border=True):
-            st.markdown("### Condizioni")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.session_state.state["sepsi"] = st.checkbox("Sepsi")
-            with col2:
-                st.session_state.state["conmed"] = st.checkbox("Contrast Medium")
-            with col3:
-                st.session_state.state["surgical_op"] = st.checkbox("Surgical Operation")
+                st.checkbox("Antihypertensive drugs")
 
     def render_multiselect(self):
         with st.container(border=True):
@@ -136,6 +127,41 @@ class HomePage:
                     procedures_df["label"].isin(labels)
                 ]["itemid"].tolist()
 
+            self.check_granularity()
+
+
+
+    def check_granularity(self):
+        isPressure = False
+        for id_chart in self.chartevents_ids:
+            if id_chart in self.PRESSURE_ITEMIDS:
+                isPressure = True
+
+        if not isPressure:
+            return
+
+        st.write("Seleziona ogni quanto prendere le pressioni e se il minimo/massimo/media")
+
+        col_g, col_a = st.columns(2)
+
+        with col_g:
+            gran_label = st.selectbox(
+                f"Granularità",
+                options=list(self.GRANULARITY_OPTIONS.keys()),
+                index=2,  # default "1 ora"
+                key=f"gran",
+            )
+        with col_a:
+            agg_label = st.selectbox(
+                f"Aggregazione",
+                options=self.AGGREGATION_OPTIONS,
+                index=0,  # default "Media"
+                key=f"agg",
+            )
+
+        self.granularity_state["gran_label"] = gran_label
+        self.granularity_state["agg_label"] = agg_label
+
     def render_button(self):
         st.write("")
         col_l, col_c, col_r = st.columns([1, 1, 1])
@@ -148,6 +174,7 @@ class HomePage:
                 print(self.inputevents_ids)
                 print(self.procedures_ids)
                 print(self.outputevents_ids)
+                print(self.granularity_state)
 
                 df = self.con.query("SELECT * FROM patients LIMIT 10")
                 if df is not None and not df.empty:
@@ -158,8 +185,6 @@ class HomePage:
     def render(self):
         st.title("Prediction of Kidney Injury")
         self.render_farmaci()
-        self.render_pressioni()
-        self.render_condizioni()
         self.render_multiselect()
         self.render_button()
 
