@@ -183,6 +183,8 @@ class HomePage:
 
                 print("ORDINE COMPLETO (FARMACO + EVENTI):", final_order)
 
+                print(st.session_state.state["selected_features"])
+
                 try:
                     df = self.con.query("SELECT * FROM patients LIMIT 10")
                     if df is not None and not df.empty:
