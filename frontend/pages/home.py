@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import streamlit as st
-from database.connection import Connection
 
 
 class HomePage:
@@ -26,8 +25,6 @@ class HomePage:
         self.BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
 
-        self.con = self.get_database_connection()
-
         # Inizializzazione dello Stato Globale
         if "state" not in st.session_state:
             st.session_state.state = {
@@ -50,10 +47,6 @@ class HomePage:
         if os.path.exists(path):
             return pd.read_csv(path).dropna(how="all")
         return pd.DataFrame(columns=["itemid", "label"])
-
-    @st.cache_resource
-    def get_database_connection(_self):
-        return Connection()
 
     def local_css(self, file_name):
         try:
@@ -184,14 +177,6 @@ class HomePage:
                 print("ORDINE COMPLETO (FARMACO + EVENTI):", final_order)
 
                 print(st.session_state.state["selected_features"])
-
-                try:
-                    df = self.con.query("SELECT * FROM patients LIMIT 10")
-                    if df is not None and not df.empty:
-                        st.session_state.state["example"] = df
-                except Exception as e:
-                    st.error(f"Errore DB: {e}")
-                    return
 
                 st.switch_page("pages/result.py")
 

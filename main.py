@@ -1,20 +1,15 @@
-
 import subprocess
+import sys
 
-class Application :
+def start_fastapi():
+    return subprocess.Popen([sys.executable, "-m", "uvicorn", "backend.main:app", "--reload"])
 
-    def start_backend(self):
-        pass
-
-    def start_frontend(self):
-        subprocess.run(["streamlit", "run", "frontend/app.py"])
-
-    def run(self):
-        self.start_frontend()
-
-
-
+def start_streamlit():
+    return subprocess.Popen(["streamlit", "run", "frontend/app.py"])
 
 if __name__ == "__main__":
-    app = Application()
-    app.run()
+    fastapi_proc = start_fastapi()
+    streamlit_proc = start_streamlit()
+
+    fastapi_proc.wait()
+    streamlit_proc.wait()
