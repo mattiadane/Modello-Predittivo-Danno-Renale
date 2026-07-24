@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from connection import  get_db
+from .connection import  get_db
 
 app = FastAPI()
 
