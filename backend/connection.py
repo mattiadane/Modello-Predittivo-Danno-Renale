@@ -16,6 +16,7 @@ HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 DATABASE = os.getenv("DATABASE")
 SCHEMA = os.getenv("SCHEMA")
+SCHEMA2 = os.getenv("SCHEMA2")
 PASSWORD = os.getenv("PASSWORD")
 
 
