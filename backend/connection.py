@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import dotenv
-from sqlalchemy import create_engine, URL
+from sqlalchemy import URL, create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 # 1. Trova la cartella 'backend' (dove risiede connection.py e il .env)
@@ -15,10 +15,9 @@ dotenv.load_dotenv(dotenv_path=ENV_PATH, override=True)
 HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 DATABASE = os.getenv("DATABASE")
-SCHEMA = os.getenv("SCHEMA")
-SCHEMA2 = os.getenv("SCHEMA2")
+SCHEMA = os.getenv("SCHEMA", "public")
+USERNAME = os.getenv("USERNAME", "Username")  # Se necessario leggi anche l'user da env
 PASSWORD = os.getenv("PASSWORD")
-
 
 if not HOST:
     raise ValueError(
@@ -30,7 +29,7 @@ url = URL.create(
     username="Mattia Danese",
     password=PASSWORD,
     host=HOST,
-    port=PORT,
+    port=int(PORT) if PORT else 5432,
     database=DATABASE,
 )
 
@@ -38,8 +37,15 @@ engine = create_engine(
     url,
     pool_size=5,
     max_overflow=10,
-    connect_args={"options": f"-c search_path={SCHEMA}"},
 )
+
+
+# Configura lo search_path per tutte le connessioni in modo sicuro
+@event.listens_for(engine, "connect")
+def set_search_path(dbapi_connection, connection_record):
+    with dbapi_connection.cursor() as cursor:
+        cursor.execute(f'SET search_path TO "{SCHEMA}", public;')
+
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

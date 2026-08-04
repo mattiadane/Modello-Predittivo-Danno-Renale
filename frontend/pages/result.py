@@ -12,13 +12,9 @@ if "pipeline_input" not in st.session_state or not st.session_state["pipeline_in
     st.stop()  # Ferma l'esecuzione dello script qui
 
 
-
-print(st.session_state["pipeline_input"])
-
-
-'''
 try:
-    response = requests.get("http://127.0.0.1:8000/AKI",json=st.session_state["pipeline_input"])
+    payload = {"parametri" : st.session_state["pipeline_input"]}
+    response = requests.get("http://127.0.0.1:8000/AKI",json=payload)
     if response.status_code == 200:
         st.success("Dati inviati ed elaborati con successo!")
         risultati = response.json()
@@ -30,7 +26,6 @@ try:
 except requests.exceptions.RequestException as e:
         st.error(f"Impossibile connettersi al backend: {e}")
 
-'''
 
 if st.button("Back to Home Page"):
     st.session_state.clear()

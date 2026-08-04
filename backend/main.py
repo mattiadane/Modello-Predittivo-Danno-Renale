@@ -2,26 +2,14 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from streamlit import status
-
 from .connection import  get_db
-from schema import  PipelineInput
-import  dao
+from backend.schema import  PipelineInput
+import  backend.dao as dao
 
 
 
 
 app = FastAPI()
-
-
-@app.get("/patient")
-async def root(session : Session = Depends(get_db)):
-  result =  session.execute(text("SELECT * FROM patients LIMIT 10")).fetchall()
-
-  if not result:
-    return {"message": "No patient found"}
-
-  return [dict(r._mapping) for r in result]
-
 
 @app.get("/AKI")
 async def root(session : Session = Depends(get_db), payload : PipelineInput = None) :
@@ -31,7 +19,12 @@ async def root(session : Session = Depends(get_db), payload : PipelineInput = No
         detail="Nessun parametro passato."
       )
 
-  result = session.execute(dao.prediction_AKI(payload)).mappings().all()
+  sql_q = dao.prediction_AKI(payload)
+  print("\n" + "=" * 50, flush=True)
+  print("QUERY GENERATA CON SUCCESSO:", flush=True)
+  print(sql_q, flush=True)
+  print("=" * 50 + "\n", flush=True)
+  result = session.execute(text(sql_q)).mappings().all()
   if not result:
     return {
       "status": "empty",

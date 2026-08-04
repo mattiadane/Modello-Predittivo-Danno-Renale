@@ -158,7 +158,7 @@ def render_multiselect(selected_drugs: list) -> tuple[list, list]:
             current_labels.extend(labels_lab)
 
             labels_proc = st.multiselect("Procedures", procedures_df["label"].tolist(), key="ms_proc")
-            all_events_objects.extend(extract_selected_items(procedures_df, labels_proc, "procedures"))
+            all_events_objects.extend(extract_selected_items(procedures_df, labels_proc, "procedureevents"))
             current_labels.extend(labels_proc)
 
         # Rimuove duplicati mantenendo l'ordine
@@ -267,7 +267,7 @@ def render_button():
 
     with col_c:
         if st.button("Elabora Modello", use_container_width=True, type="primary"):
-            pipeline_data = st.session_state.get("pipeline_input", [])
+            pipeline_data =  st.session_state.get("pipeline_input", [])
 
             if not pipeline_data:
                 st.warning("Seleziona e ordina almeno un parametro prima di proseguire.")
