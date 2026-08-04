@@ -237,7 +237,7 @@ def final_query(dict) -> str:
 
     field_str = ", ".join(select_fields)
 
-    query = f"SELECT {field_str} FROM stable_patient sp\n"
+    query = f"SELECT DISTINCT {field_str} FROM stable_patient sp\n"
 
     count = 1
     prec_key = "sp"
@@ -260,7 +260,7 @@ def final_query(dict) -> str:
 
     where_fields = " AND ".join(where_fields)
 
-    query += f"WHERE {where_fields}\nORDER BY sp.subject_id"
+    query += f"WHERE {where_fields}\nORDER BY sp.subject_id\nLIMIT 100"
     return query
 
 
@@ -277,6 +277,8 @@ def prediction_AKI(payload: PipelineInput):
 
     query += "\n)\n"
     query += final_query(cte_params)
+
+    return query
 
 
 '''
