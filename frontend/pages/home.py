@@ -269,8 +269,10 @@ def render_button():
         if st.button("Elabora Modello", use_container_width=True, type="primary"):
             pipeline_data =  st.session_state.get("pipeline_input", [])
 
-            if not pipeline_data:
-                st.warning("Seleziona e ordina almeno un parametro prima di proseguire.")
+            len(pipeline_data)
+
+            if not pipeline_data or ( len(pipeline_data) < 3  or len(pipeline_data) > 6):
+                st.warning("Seleziona dai 3 ai 6 parametri")
                 return
 
             st.switch_page("pages/result.py")

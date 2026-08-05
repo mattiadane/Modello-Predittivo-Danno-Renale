@@ -102,7 +102,6 @@ def first_tmpv(first_param: ParametroConfig):
             f"  FROM {C}{first_param.tabella}\n"
             f"  WHERE itemid = {first_param.id} AND val IS NOT NULL\n"
             f"  ORDER BY {config['distinct']}, valid_time ASC\n"
-            f")"
         )
 
         return {NAME_VIEW[1]: param_as, "query": query}
@@ -222,7 +221,7 @@ def n_tmpv(idx: int, param: ParametroConfig):
     }
 
 
-def final_query(dict) -> str:
+def final_query(dict,LIMIT : int = 50,OFFSET : int = 0) -> str:
     select_fields = ["sp.subject_id"]
     where_fields = []
 
@@ -260,11 +259,11 @@ def final_query(dict) -> str:
 
     where_fields = " AND ".join(where_fields)
 
-    query += f"WHERE {where_fields}\nORDER BY sp.subject_id\nLIMIT 100"
+    query += f"WHERE {where_fields}\nORDER BY sp.subject_id\nLIMIT {LIMIT} OFFSET {OFFSET}"
     return query
 
 
-def prediction_AKI(payload: PipelineInput):
+def prediction_AKI(payload: PipelineInput,limit = 50, offset = 0):
     parameters = payload.parametri
     cte_params = {}
 
@@ -276,7 +275,7 @@ def prediction_AKI(payload: PipelineInput):
         cte_params[NAME_VIEW[idx + 1]] = n_tmpv(idx + 1, param)[NAME_VIEW[idx + 1]]
 
     query += "\n)\n"
-    query += final_query(cte_params)
+    query += final_query(cte_params,limit,offset)
 
     return query
 
