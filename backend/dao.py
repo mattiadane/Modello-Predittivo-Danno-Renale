@@ -1,18 +1,6 @@
-from typing import Any
+from sqlalchemy.sql.util import join_condition
 
 from backend.schema import PipelineInput, ParametroConfig
-
-
-def sql_alias(name: str) -> str:
-    """
-    Genera un alias SQL sicuro:
-    - rimuove virgolette interne
-    - mantiene spazi e caratteri speciali
-    - racchiude tutto tra virgolette doppie
-    """
-    cleaned = name.replace('"', '').strip()
-    return f"\"{cleaned}\""
-
 
 C = "v_"
 NAME_VIEW = {
@@ -65,155 +53,139 @@ def sql_alias(name: str) -> str:
 
 def first_tmpv(first_param: ParametroConfig):
     config = VIEW_CONFIG[first_param.tabella]
-    gran_seconds = 0
+
     param_as = []
     select_fields = []
+    where_fields = [f"itemid = {first_param.id}"]
+    group_fields = []
 
     # stay_id / hadm_id
     if first_param.tabella != "labevents":
         select_fields.append("stay_id")
+        group_fields.append("stay_id")
     select_fields.append("hadm_id")
+    group_fields.append("hadm_id")
+
+
+
+    gran_hours = int(first_param.granularita.replace("h", "")) if first_param.granularita else 1
+    gran_seconds = gran_hours * 3600
+
+    group_fields.append(f"FLOOR(EXTRACT(EPOCH FROM valid_time) / {gran_seconds})")
+
+    select_fields.append("MIN(valid_time) AS t_0")
+    param_as.append("t_0")
+
+    select_fields.append("(MIN(valid_time) + INTERVAL '72 hours') AS end_ow")
 
     # label opzionale
     if config["label"]:
         select_fields.append(config["label"])
         param_as.append(config["label"])
+        group_fields.append(config["label"])
 
-    # ============================================================
-    # CASO 1 — SENZA GRANULARITÀ → PRIMA OCCORRENZA (DISTINCT ON)
-    # ============================================================
-    if first_param.granularita is None and first_param.aggregazione is None:
-
-        select_fields.append("valid_time AS t_0")
-        param_as.append("t_0")
-
-        if config["value"]:
-            alias = sql_alias(first_param.parametro)
-            select_fields.append(f"{config['value']} AS {alias}")
-            param_as.append(first_param.parametro)
-
-        select_fields.append("(valid_time + INTERVAL '72 hours') AS end_ow")
-
-        fields_str = ", ".join(select_fields)
-
-        query = (
-            f"WITH {NAME_VIEW[1]} AS (\n"
-            f"  SELECT DISTINCT ON ({config['distinct']}) {fields_str}\n"
-            f"  FROM {C}{first_param.tabella}\n"
-            f"  WHERE itemid = {first_param.id} AND val IS NOT NULL\n"
-            f"  ORDER BY {config['distinct']}, valid_time ASC\n"
-        )
-
-        return {NAME_VIEW[1]: param_as, "query": query}
-
-    # ============================================================
-    # CASO 2 — CON GRANULARITÀ → SERVE IL GROUP BY
-    # ============================================================
-    else:
-        gran_hours = int(first_param.granularita.replace("h", "")) if first_param.granularita else 1
-        gran_seconds = gran_hours * 3600
-
-        # bucket temporale corretto
+    if first_param.aggregazione and config["value"]:
+        alias = sql_alias(first_param.parametro)
         select_fields.append(
-            f"FLOOR(EXTRACT(EPOCH FROM valid_time) / {gran_seconds}) AS bucket_num"
+            f"{AGGREGATION_OPTIONS[first_param.aggregazione]}({config['value']}) AS {alias}"
         )
-        param_as.append("bucket_num")
-
-        # t_0 = MIN(valid_time) del bucket
-        select_fields.append("MIN(valid_time) AS t_0")
-        param_as.append("t_0")
-
-        # aggregazione del valore
-        if first_param.aggregazione and config["value"]:
-            alias = sql_alias(first_param.parametro)
-            select_fields.append(
-                f"{AGGREGATION_OPTIONS[first_param.aggregazione]}({config['value']}) AS {alias}"
-            )
-            param_as.append(first_param.parametro)
-
-        # end_ow basato su t_0 aggregato
-        select_fields.append("MIN(valid_time) + INTERVAL '72 hours' AS end_ow")
-
-        fields_str = ", ".join(select_fields)
-
-        query = (
-            f"WITH {NAME_VIEW[1]} AS (\n"
-            f"  SELECT {fields_str}\n"
-            f"  FROM {C}{first_param.tabella}\n"
-            f"  WHERE itemid = {first_param.id} AND val IS NOT NULL\n"
-        )
-        query += f"  GROUP BY {config['distinct']},"
-        if first_param.tabella != "labevents":
-            query += f"hadm_id,"
-        query += f"  FLOOR(EXTRACT(EPOCH FROM valid_time) / {gran_seconds})\n"
+        param_as.append(first_param.parametro)
+        where_fields.append(f"{config['value']} IS NOT NULL")
 
 
-        return {NAME_VIEW[1]: param_as, "query": query}
+    field_str = ", ".join(select_fields)
+    where_str = " AND ".join(where_fields)
+    group_str = ", ".join(group_fields)
+
+    query = (
+        f"WITH {NAME_VIEW[1]} AS (\n"
+        f" SELECT {field_str}\n"
+        f" FROM {C}{first_param.tabella}\n"
+        f" WHERE {where_str}\n"
+        f" GROUP BY {group_str}\n"
+        f")"
+    )
 
 
-def n_tmpv(idx: int, param: ParametroConfig):
+    return {NAME_VIEW[1]: param_as, "query": query}
+
+def n_tmpv(idx: int, param: ParametroConfig, paramPrec: str):
+    config = VIEW_CONFIG[param.tabella]
+
+
     subname = param.tabella[0:2]
     if subname == "in":
         subname = "inp"
 
-    config = VIEW_CONFIG[param.tabella]
     select_fields = []
     param_as = []
-    gran_seconds = 0
+    where_fields = [
+        f"{subname}.itemid = {param.id}",
+        f"{subname}.valid_time BETWEEN f{idx-1}.t_{idx-2} AND f{idx-1}.end_ow"
+    ]
+    group_fields = []
 
-    select_fields.append("f1.stay_id")
 
-    if param.granularita is None and param.aggregazione is None:
-        select_fields.append(f"{subname}.valid_time AS t_{idx-1}")
-        param_as.append(f"t_{idx-1}")
 
-        if config['value']:
-            alias = sql_alias(param.parametro)
-            select_fields.append(f"{subname}.{config['value']} AS {alias}")
-            param_as.append(param.parametro)
+    select_fields.append(f"f{idx-1}.stay_id")
+    select_fields.append(f"f{idx - 1}.hadm_id")
+    select_fields.append(f"f{idx-1}.end_ow")
+    group_fields.append(f"f{idx-1}.end_ow")
+    group_fields.append(f"f{idx-1}.stay_id")
+    group_fields.append(f"f{idx - 1}.hadm_id")
 
-    else:
-        gran_hours = int(param.granularita.replace("h", "")) if param.granularita else 1
-        gran_seconds = gran_hours * 3600
 
-        select_fields.append(
-            f"FLOOR(EXTRACT(EPOCH FROM ({subname}.valid_time - f1.t_0)) / {gran_seconds}) AS bucket_num"
-        )
-        param_as.append("bucket_num")
+    var = idx-2
 
-        select_fields.append(f"MIN({subname}.valid_time) AS t_{idx-1}")
-        param_as.append(f"t_{idx-1}")
+    while var >= 0:
+        select_fields.append(f"f{idx-1}.t_{var}")
+        group_fields.append(f"f{idx-1}.t_{var}")
+        var -= 1
 
-        if param.aggregazione and config["value"]:
-            alias = sql_alias(param.parametro)
-            select_fields.append(
-                f"{AGGREGATION_OPTIONS[param.aggregazione]}({subname}.{config['value']}) AS {alias}"
-            )
-            param_as.append(param.parametro)
 
-    if config['label']:
+
+    # granularità → bucket temporale
+    gran_hours = int(param.granularita.replace("h", "")) if param.granularita else 1
+    gran_seconds = gran_hours * 3600
+
+    group_fields.append(f"FLOOR(EXTRACT(EPOCH FROM {subname}.valid_time) / {gran_seconds})")
+
+
+    # tempo minimo del bucket
+    select_fields.append(f"MIN({subname}.valid_time) AS t_{idx-1}")
+    param_as.append(f"t_{idx-1}")
+
+
+
+
+    if config["label"]:
         select_fields.append(f"{subname}.{config['label']}")
         param_as.append(config["label"])
+        group_fields.append(f"{subname}.{config['label']}")
 
-    fields_str = ", ".join(select_fields)
+
+    # aggregazione
+    if param.aggregazione and config["value"]:
+        alias = sql_alias(param.parametro)
+        select_fields.append(
+            f"{AGGREGATION_OPTIONS[param.aggregazione]}({subname}.{config['value']}) AS {alias}"
+        )
+        param_as.append(param.parametro)
+        where_fields.append(f"{subname}.{config['value']} IS NOT NULL")
+
+    field_str = ", ".join(select_fields)
+    where_str = " AND ".join(where_fields)
+    group_str = ", ".join(group_fields)
 
     query = (
-        f"),\n{NAME_VIEW[idx]} AS (\n"
-        f"  SELECT {fields_str}\n"
-        f"  FROM {C}{param.tabella} {subname}\n"
-        f"  INNER JOIN first_param f1 ON f1.{config['distinct']} = {subname}.{config['distinct']}\n"
-        f"  WHERE {subname}.itemid = {param.id} AND\n"
-        f"  {subname}.valid_time BETWEEN f1.t_0 AND f1.end_ow"
+        f",\n{NAME_VIEW[idx]} AS (\n"
+        f" SELECT {field_str}\n"
+        f" FROM {C}{param.tabella} {subname}\n"
+        f" INNER JOIN {paramPrec} f{idx-1} ON f{idx-1}.{config['distinct']} = {subname}.{config['distinct']}\n"
+        f" WHERE {where_str}\n"
+        f" GROUP BY {group_str}\n"
+        f")"
     )
-
-    if config['value']:
-        query += f" AND\n  {subname}.{config['value']} IS NOT NULL\n"
-
-    if param.granularita and param.aggregazione:
-        query += (
-            f"  GROUP BY f1.stay_id, "
-            f"FLOOR(EXTRACT(EPOCH FROM ({subname}.valid_time - f1.t_0)) / {gran_seconds})\n"
-        )
 
     return {
         NAME_VIEW[idx]: param_as,
@@ -221,45 +193,40 @@ def n_tmpv(idx: int, param: ParametroConfig):
     }
 
 
-def final_query(dict,LIMIT : int = 50,OFFSET : int = 0) -> str:
+
+def final_query(dict,limit : int = 50,offset : int = 0) -> str:
     select_fields = ["sp.subject_id"]
-    where_fields = []
+    join_fields = []
 
     count = 1
     for key, value in dict.items():
         subname = f"f{count}"
         for val in value:
-            if val == "bucket_num":
-                continue
             select_fields.append(f"{subname}.{sql_alias(val)}")
+        if count == 1:
+            join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id")
+        else :
+            join_conditions = []
+            var = count - 2
+            while var >= 0:
+                join_conditions.append(f"f{count}.t_{var} = f{count-1}.t_{var}")
+                var -= 1
+            join_strs = " AND ".join(join_conditions)
+            join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id AND {join_strs}")
         count += 1
+
 
     field_str = ", ".join(select_fields)
 
-    query = f"SELECT DISTINCT {field_str} FROM stable_patient sp\n"
+    join_str = "\n".join(join_fields)
 
-    count = 1
-    prec_key = "sp"
-    for key in dict.keys():
-        if prec_key != "sp":
-            query += (
-                f"INNER JOIN {key} f{count} ON (f{count}.stay_id = f{count - 1}.stay_id"
-            )
-            if "bucket_num" in dict[key] and "bucket_num" in dict[prec_key]:
-                query += f" AND {key}.bucket_num = {prec_key}.bucket_num"
-            query += ")\n"
-        else:
-            query += f"INNER JOIN {key} f{count} ON (sp.stay_id = f{count}.stay_id)\n"
 
-        prec_key = key
-        count += 1
+    query = (
+        f"SELECT DISTINCT {field_str} FROM stable_patient sp\n"
+        f"{join_str}\n"
+        f"ORDER BY sp.subject_id\nLIMIT {limit} OFFSET {offset}"
+    )
 
-    for i in range(1, len(dict.keys())):
-        where_fields.append(f" f{i+1}.t_{i} > f{i}.t_{i-1}")
-
-    where_fields = " AND ".join(where_fields)
-
-    query += f"WHERE {where_fields}\nORDER BY sp.subject_id\nLIMIT {LIMIT} OFFSET {OFFSET}"
     return query
 
 
@@ -270,14 +237,17 @@ def prediction_AKI(payload: PipelineInput,limit = 50, offset = 0):
     query = first_tmpv(parameters[0])["query"]
     cte_params[NAME_VIEW[1]] = first_tmpv(parameters[0])[NAME_VIEW[1]]
 
+    param_prec = NAME_VIEW[1]
     for idx, param in enumerate(parameters[1:], 1):
-        query += n_tmpv(idx + 1, param)["query"]
-        cte_params[NAME_VIEW[idx + 1]] = n_tmpv(idx + 1, param)[NAME_VIEW[idx + 1]]
+        query += n_tmpv(idx + 1, param,param_prec)["query"]
+        cte_params[NAME_VIEW[idx + 1]] = n_tmpv(idx + 1, param,param_prec)[NAME_VIEW[idx + 1]]
+        param_prec = NAME_VIEW[idx+1]
 
-    query += "\n)\n"
+    query += "\n"
     query += final_query(cte_params,limit,offset)
 
     return query
+
 
 
 '''
@@ -291,7 +261,9 @@ if __name__ == "__main__":
             ParametroConfig(
                 tabella="chartevents",
                 id=220045,
-                parametro="heart_rate"
+                parametro="heart_rate",
+                granularita="6h",
+                aggregazione="Media"
             ),
             # Secondo parametro (con aggregazione e granularità)
             ParametroConfig(
@@ -305,7 +277,9 @@ if __name__ == "__main__":
             ParametroConfig(
                 tabella="procedureevents",
                 id=224275,
-                parametro="dialysis_present"
+                parametro="dialysis_present",
+                granularita="6h",
+                aggregazione="Media"
             )
         ]
     )
@@ -316,4 +290,6 @@ if __name__ == "__main__":
     # Stampa dei risultati
     print("--- QUERY GENERATA ---")
     print(sql_query)
+    
 '''
+

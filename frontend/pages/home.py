@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 # --- COSTANTI E PERCORSI ---
-
+'''
 NEPRO = [
     "Gentamicin", "Vancomycin", "Tobramycin", "Amikacin", "Penicillamine",
     "Auranofin", "Sulfamethoxazole", "Trimethoprim", "Sulfametrole",
@@ -35,6 +35,7 @@ DRUG_GROUPS_MAP = {
     "Diuretic drugs": DIUR,
     "Antihypertensive drugs": ANTIPER
 }
+'''
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -166,16 +167,13 @@ def render_multiselect(selected_drugs: list) -> tuple[list, list]:
         return available_labels, all_events_objects
 
 
-def check_granularity(events_objects: list) -> dict | None:
-    """Mostra la configurazione di granularità solo se è presente un parametro vitale in Chartevents."""
-    chart_ids = [item["id"] for item in events_objects if item["tabella"] == "chartevents"]
-    is_pressure = any(id_chart in VITAL_ITEMIDS for id_chart in chart_ids)
-
-    if not is_pressure:
+def check_granularity(available_options: list) -> dict | None:
+    """Mostra la configurazione di granularità se è stato selezionato almeno un parametro o farmaco."""
+    if not available_options:
         return None
 
     st.write("---")
-    st.write("**Configurazione Parametri vitali:**")
+    st.write("**Configurazione Parametri:**")
     col_g, col_a = st.columns(2)
 
     with col_g:
@@ -234,23 +232,28 @@ def render_ordering_section(available_options: list, events_objects: list, granu
         # Costruzione dell'UNICO array che servirà al backend
         final_ordered_features = []
         for label in ordered_labels:
+            feature_data = {}
+
+            '''
             # Caso Farmaco
             if label in DRUG_GROUPS_MAP:
-                final_ordered_features.append({
+                feature_data = {
                     "tabella": "farmaci",
                     "parametro": label,
                     "items": DRUG_GROUPS_MAP[label]
-                })
+                }
+            '''
             # Caso Evento Clinico
-            elif label in item_lookup_map:
-                event_data = item_lookup_map[label].copy()
+            if label in item_lookup_map:
+                feature_data = item_lookup_map[label].copy()
 
-                # Inserisce granularità/aggregazione se è una pressione
-                if event_data["id"] in VITAL_ITEMIDS and granularity_info:
-                    event_data["granularita"] = granularity_info["granularita"]
-                    event_data["aggregazione"] = granularity_info["aggregazione"]
+            # Aggiunge SEMPRE granularità e aggregazione a tutti i parametri selezionati
+            if feature_data and granularity_info:
+                feature_data["granularita"] = granularity_info["granularita"]
+                feature_data["aggregazione"] = granularity_info["aggregazione"]
 
-                final_ordered_features.append(event_data)
+            if feature_data:
+                final_ordered_features.append(feature_data)
 
         # SALVIAMO UNICAMENTE L'ARRAY FINALE PER IL BACKEND
         st.session_state["pipeline_input"] = final_ordered_features
@@ -266,12 +269,10 @@ def render_button():
     _, col_c, _ = st.columns([1, 1, 1])
 
     with col_c:
-        if st.button("Elabora Modello", use_container_width=True, type="primary"):
-            pipeline_data =  st.session_state.get("pipeline_input", [])
+        if st.button("Elabora Modello",width='stretch', type="primary"):
+            pipeline_data = st.session_state.get("pipeline_input", [])
 
-            len(pipeline_data)
-
-            if not pipeline_data or ( len(pipeline_data) < 3  or len(pipeline_data) > 6):
+            if not pipeline_data or (len(pipeline_data) < 3 or len(pipeline_data) > 6):
                 st.warning("Seleziona dai 3 ai 6 parametri")
                 return
 
@@ -286,7 +287,9 @@ st.title("🩺 Prediction of Kidney Injury")
 # Passaggio dati puramente in locale tra le funzioni:
 selected_drugs = render_farmaci()
 available_labels, events_objects = render_multiselect(selected_drugs)
-granularity_info = check_granularity(events_objects)
+
+# Ora chiediamo SEMPRE granularità ed aggregazione basandoci sui parametri selezionati
+granularity_info = check_granularity(available_labels)
 
 # Assembly finale direttamente in session_state['pipeline_input']
 render_ordering_section(available_labels, events_objects, granularity_info)

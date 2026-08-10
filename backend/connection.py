@@ -36,13 +36,11 @@ url = URL.create(
 engine = create_engine(
     url,
     pool_size=5,
-    max_overflow=10,
+    max_overflow=10
 )
 
-
-# Configura lo search_path per tutte le connessioni in modo sicuro
-@event.listens_for(engine, "connect")
-def set_search_path(dbapi_connection, connection_record):
+@event.listens_for(engine, "checkout")
+def set_search_path(dbapi_connection, connection_record, connection_proxy):
     with dbapi_connection.cursor() as cursor:
         cursor.execute(f'SET search_path TO "{SCHEMA}", public;')
 
