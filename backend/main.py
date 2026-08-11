@@ -13,8 +13,6 @@ app = FastAPI()
 @app.get("/AKI")
 def root(
     payload: PipelineInput,
-    limit: int = Query(50, ge=1),
-    offset: int = Query(0, ge=0),
     session: Session = Depends(get_db),
 ):
     if payload is None or not payload.parametri:
@@ -24,10 +22,10 @@ def root(
         )
 
     # Genera la query passando limit ed offset
-    sql_q = dao.prediction_AKI(payload, limit=limit, offset=offset)
+    sql_q = dao.prediction_AKI(payload)
 
     print("\n" + "=" * 50, flush=True)
-    print(f"QUERY GENERATA (LIMIT {limit}, OFFSET {offset}):", flush=True)
+    print(f"QUERY GENERATA :", flush=True)
     print(sql_q, flush=True)
     print("=" * 50 + "\n", flush=True)
 

@@ -1,5 +1,3 @@
-from sqlalchemy.sql.util import join_condition
-
 from backend.schema import PipelineInput, ParametroConfig
 
 C = "v_"
@@ -109,14 +107,17 @@ def first_tmpv(first_param: ParametroConfig):
 
     return {NAME_VIEW[1]: param_as, "query": query}
 
-def n_tmpv(idx: int, param: ParametroConfig, paramPrec: str):
+def n_tmpv(idx: int, param: ParametroConfig, param_prec : ParametroConfig,ctePrec: str ):
     config = VIEW_CONFIG[param.tabella]
+
+    config_prec = VIEW_CONFIG[param_prec.tabella]
 
 
     subname = param.tabella[0:2]
     if subname == "in":
         subname = "inp"
 
+    join_fields = []
     select_fields = []
     param_as = []
     where_fields = [
@@ -126,12 +127,18 @@ def n_tmpv(idx: int, param: ParametroConfig, paramPrec: str):
     group_fields = []
 
 
+    if param_prec.tabella == "labevents" and ctePrec == NAME_VIEW[1]:
+        select_fields.append(f"{subname}.stay_id")
+        group_fields.append(f"{subname}.stay_id")
+        join_fields.append(f"f{idx-1}.{config_prec['distinct']} = {subname}.{config_prec['distinct']}")
+    else :
+        select_fields.append(f"f{idx-1}.stay_id")
+        group_fields.append(f"f{idx - 1}.stay_id")
+        join_fields.append(f"f{idx - 1}.{config['distinct']} = {subname}.{config['distinct']}")
 
-    select_fields.append(f"f{idx-1}.stay_id")
     select_fields.append(f"f{idx - 1}.hadm_id")
     select_fields.append(f"f{idx-1}.end_ow")
     group_fields.append(f"f{idx-1}.end_ow")
-    group_fields.append(f"f{idx-1}.stay_id")
     group_fields.append(f"f{idx - 1}.hadm_id")
 
 
@@ -176,12 +183,13 @@ def n_tmpv(idx: int, param: ParametroConfig, paramPrec: str):
     field_str = ", ".join(select_fields)
     where_str = " AND ".join(where_fields)
     group_str = ", ".join(group_fields)
+    join_str = "".join(join_fields)
 
     query = (
         f",\n{NAME_VIEW[idx]} AS (\n"
         f" SELECT {field_str}\n"
         f" FROM {C}{param.tabella} {subname}\n"
-        f" INNER JOIN {paramPrec} f{idx-1} ON f{idx-1}.{config['distinct']} = {subname}.{config['distinct']}\n"
+        f" INNER JOIN {ctePrec} f{idx-1} ON {join_str}\n"
         f" WHERE {where_str}\n"
         f" GROUP BY {group_str}\n"
         f")"
@@ -204,7 +212,12 @@ def final_query(dict,limit : int = 50,offset : int = 0) -> str:
         for val in value:
             select_fields.append(f"{subname}.{sql_alias(val)}")
         if count == 1:
-            join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id")
+            if "stay_id" in key:
+                join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id")
+            else :
+                join_fields.append(f"INNER JOIN {key} f{count} ON sp.hadm_id = f{count}.hadm_id")
+
+
         else :
             join_conditions = []
             var = count - 2
@@ -224,27 +237,31 @@ def final_query(dict,limit : int = 50,offset : int = 0) -> str:
     query = (
         f"SELECT DISTINCT {field_str} FROM stable_patient sp\n"
         f"{join_str}\n"
-        f"ORDER BY sp.subject_id\nLIMIT {limit} OFFSET {offset}"
+        f"ORDER BY sp.subject_id\n"
     )
 
     return query
 
 
-def prediction_AKI(payload: PipelineInput,limit = 50, offset = 0):
+def prediction_AKI(payload: PipelineInput):
     parameters = payload.parametri
     cte_params = {}
 
     query = first_tmpv(parameters[0])["query"]
     cte_params[NAME_VIEW[1]] = first_tmpv(parameters[0])[NAME_VIEW[1]]
 
-    param_prec = NAME_VIEW[1]
+
+    cte_prec = NAME_VIEW[1]
+    param_prec = parameters[0]
     for idx, param in enumerate(parameters[1:], 1):
-        query += n_tmpv(idx + 1, param,param_prec)["query"]
-        cte_params[NAME_VIEW[idx + 1]] = n_tmpv(idx + 1, param,param_prec)[NAME_VIEW[idx + 1]]
-        param_prec = NAME_VIEW[idx+1]
+        query += n_tmpv(idx + 1, param,param_prec,cte_prec)["query"]
+        cte_params[NAME_VIEW[idx + 1]] = n_tmpv(idx + 1, param,param_prec,cte_prec)[NAME_VIEW[idx + 1]]
+
+        param_prec = parameters[idx]
+        cte_prec = NAME_VIEW[idx+1]
 
     query += "\n"
-    query += final_query(cte_params,limit,offset)
+    query += final_query(cte_params)
 
     return query
 

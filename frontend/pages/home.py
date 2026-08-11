@@ -2,40 +2,39 @@ import os
 import pandas as pd
 import streamlit as st
 
-# --- COSTANTI E PERCORSI ---
-'''
-NEPRO = [
-    "Gentamicin", "Vancomycin", "Tobramycin", "Amikacin", "Penicillamine",
-    "Auranofin", "Sulfamethoxazole", "Trimethoprim", "Sulfametrole",
-    "Sulfamazone", "Streptomycin", "Netilmicin", "Zoledronate", "Colistin",
-    "Acyclovir", "Foscavir", "Ganciclovir", "Adefovir", "Tenofovir",
-    "Indinavir", "Cidofovir", "Cyclosporine", "Tacrolimus", "Carmustine",
-    "Mutamycin", "Prevacid", "Pamidronate"
-]
 
-DIUR = [
-    "Furosemide", "Triamterene", "Hydrochlorothiazide", "Indapamide",
-    "Spironolactone", "Tolvaptan", "Chlorothiazide", "Bumetanide",
-    "Amiloride", "Metolazone", "Eplerenone", "Chlorthalidone",
-    "Torsemide", "Aldactone", "Ethacrynic acid", "Acetazolamide"
-]
 
-ANTIPER = [
-    "Nebivolol", "Moexipril", "Sotalol", "Lisinopril", "Carvedilol",
-    "Methyldopa", "Propranolol", "Benazepril", "Aliskiren", "Ambrisentan",
-    "Clonidine", "Pindolol", "Bosentan", "Minoxidil", "Irbesartan",
-    "Prazosin", "Quinapril", "Doxazosin", "Atenolol", "Diazoxide",
-    "Metoprolol", "Esmolol", "Candesartan", "Nadolol", "Losartan",
-    "Captopril", "Valsartan", "Trandolapril", "Acebutolol", "Ramipril",
-    "Macitentan", "Guanfacine"
-]
-
-DRUG_GROUPS_MAP = {
-    "Nephrotoxicity drugs": NEPRO,
-    "Diuretic drugs": DIUR,
-    "Antihypertensive drugs": ANTIPER
-}
-'''
+# NEPRO = [
+#     "Gentamicin", "Vancomycin", "Tobramycin", "Amikacin", "Penicillamine",
+#     "Auranofin", "Sulfamethoxazole", "Trimethoprim", "Sulfametrole",
+#     "Sulfamazone", "Streptomycin", "Netilmicin", "Zoledronate", "Colistin",
+#     "Acyclovir", "Foscavir", "Ganciclovir", "Adefovir", "Tenofovir",
+#     "Indinavir", "Cidofovir", "Cyclosporine", "Tacrolimus", "Carmustine",
+#     "Mutamycin", "Prevacid", "Pamidronate"
+# ]
+#
+# DIUR = [
+#     "Furosemide", "Triamterene", "Hydrochlorothiazide", "Indapamide",
+#     "Spironolactone", "Tolvaptan", "Chlorothiazide", "Bumetanide",
+#     "Amiloride", "Metolazone", "Eplerenone", "Chlorthalidone",
+#     "Torsemide", "Aldactone", "Ethacrynic acid", "Acetazolamide"
+# ]
+#
+# ANTIPER = [
+#     "Nebivolol", "Moexipril", "Sotalol", "Lisinopril", "Carvedilol",
+#     "Methyldopa", "Propranolol", "Benazepril", "Aliskiren", "Ambrisentan",
+#     "Clonidine", "Pindolol", "Bosentan", "Minoxidil", "Irbesartan",
+#     "Prazosin", "Quinapril", "Doxazosin", "Atenolol", "Diazoxide",
+#     "Metoprolol", "Esmolol", "Candesartan", "Nadolol", "Losartan",
+#     "Captopril", "Valsartan", "Trandolapril", "Acebutolol", "Ramipril",
+#     "Macitentan", "Guanfacine"
+# ]
+#
+# DRUG_GROUPS_MAP = {
+#     "Nephrotoxicity drugs": NEPRO,
+#     "Diuretic drugs": DIUR,
+#     "Antihypertensive drugs": ANTIPER
+# }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -234,15 +233,15 @@ def render_ordering_section(available_options: list, events_objects: list, granu
         for label in ordered_labels:
             feature_data = {}
 
-            '''
+
             # Caso Farmaco
-            if label in DRUG_GROUPS_MAP:
-                feature_data = {
-                    "tabella": "farmaci",
-                    "parametro": label,
-                    "items": DRUG_GROUPS_MAP[label]
-                }
-            '''
+            # if label in DRUG_GROUPS_MAP:
+            #     feature_data = {
+            #         "tabella": "farmaci",
+            #         "parametro": label,
+            #         "items": DRUG_GROUPS_MAP[label]
+            #     }
+            #
             # Caso Evento Clinico
             if label in item_lookup_map:
                 feature_data = item_lookup_map[label].copy()

@@ -6,70 +6,77 @@ st.set_page_config(page_title="Result of query", layout="wide")
 
 st.title("Result of query")
 
-if "dati_accumulatori" not in st.session_state:
-    st.session_state["dati_accumulatori"] = []
-if "current_offset" not in st.session_state:
-    st.session_state["current_offset"] = 0
-if "has_more" not in st.session_state:
-    st.session_state["has_more"] = True
+# Configuration
+PAGE_SIZE = 50
+
+# 1. Inizializzazione Session State
+if "tutti_i_dati" not in st.session_state:
+    st.session_state["tutti_i_dati"] = None
+if "pagina_corrente" not in st.session_state:
+    st.session_state["pagina_corrente"] = 1
 
 
-def carica_prossime_righe():
+def carica_tutti_i_dati():
+    """Scarica l'intero dataset in un'unica chiamata."""
     try:
         payload = {"parametri": st.session_state.get("pipeline_input")}
-        params = {"limit": 50, "offset": st.session_state["current_offset"]}
 
-        response = requests.get(
-            "http://127.0.0.1:8000/AKI", json=payload, params=params
-        )
+        # Nessun parametro 'limit' o 'offset' inviato al backend
+        with st.spinner("Caricamento completo dei dati in corso..."):
+            response = requests.get(
+                "http://127.0.0.1:8000/AKI", json=payload
+            )
 
         if response.status_code == 200:
-            nuove_righe = response.json()
-
-            if nuove_righe:
-                st.session_state["dati_accumulatori"].extend(nuove_righe)
-                st.session_state["current_offset"] += len(nuove_righe)
-
-                if len(nuove_righe) < 50:
-                    st.session_state["has_more"] = False
+            dati = response.json()
+            if dati:
+                st.session_state["tutti_i_dati"] = dati
+                st.session_state["pagina_corrente"] = 1
             else:
-                st.session_state["has_more"] = False
+                st.info("Non sono stati trovati pazienti che soddisfano i parametri selezionati.")
+                st.session_state["tutti_i_dati"] = []
         else:
-            st.error(
-                f"Errore dal server ({response.status_code}): {response.text}"
-            )
+            st.error(f"Errore dal server ({response.status_code}): {response.text}")
+
     except requests.exceptions.RequestException as e:
         st.error(f"Impossibile connettersi al backend: {e}")
 
 
-# Primo caricamento automatico
-if not st.session_state["dati_accumulatori"] and st.session_state["has_more"]:
-    carica_prossime_righe()
+# 2. Caricamento iniziale (eseguito solo la prima volta)
+if st.session_state["tutti_i_dati"] is None:
+    carica_tutti_i_dati()
 
-# Visualizzazione della tabella e dei controlli
-if st.session_state["dati_accumulatori"]:
+# 3. Visualizzazione e Paginazione In-Memory
+if st.session_state["tutti_i_dati"]:
     st.success("Dati caricati con successo!")
 
-    df = pd.DataFrame(st.session_state["dati_accumulatori"])
+    tutti_i_dati = st.session_state["tutti_i_dati"]
+    totale_righe = len(tutti_i_dati)
+    totale_pagine = max(1, (totale_righe + PAGE_SIZE - 1) // PAGE_SIZE)
 
-    # 1. Calcolo dinamico delle colonne
-    num_colonne = len(df.columns)
+    # Assicuriamoci che la pagina corrente rientri nei limiti validi
+    pagina = st.session_state["pagina_corrente"]
 
-    # Assegniamo ~140px a colonna, ma non scendiamo sotto il 100% per riempire bene lo schermo
+    # Calcolo dell'intervallo (Slice) per la pagina corrente
+    start_idx = (pagina - 1) * PAGE_SIZE
+    end_idx = start_idx + PAGE_SIZE
+
+    # Estraiamo SOLO i record della pagina attuale per il DataFrame
+    dati_pagina = tutti_i_dati[start_idx:end_idx]
+    df_pagina = pd.DataFrame(dati_pagina)
+
+    num_colonne = len(df_pagina.columns)
     larghezza_calcolata = f"max(100%, {num_colonne * 140}px)"
+    html_table = df_pagina.to_html(classes="fixed-table", index=False)
 
-    # Genera la tabella HTML senza indice
-    html_table = df.to_html(classes="fixed-table", index=False)
-
-    # 2. Iniezione CSS avanzata
+    # Styling CSS
     st.markdown(
         f"""
         <style>
-        /* Contenitore ad altezza e larghezza fissa con scroll verticale */
         .table-container {{
-            max-height: 500px; /* Altezza fissa della tabella */
-            overflow-y: auto;  /* Scroll verticale solo per scorrere i dati */
-            overflow-x: hidden; /* Blocca del tutto lo scroll orizzontale */
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: hidden;
             border: 1px solid rgba(250, 250, 250, 0.2);
             border-radius: 6px;
             margin-bottom: 10px;
@@ -91,11 +98,10 @@ if st.session_state["dati_accumulatori"]:
             border: 1px solid rgba(250, 250, 250, 0.1);
         }}
 
-        /* Intestazione fissa in alto quando si fa lo scroll verticale */
         .fixed-table th {{
             position: sticky;
             top: 0;
-            background-color: #1e1e1e; /* Sfondo scuro per bloccare le righe sotto */
+            background-color: #1e1e1e;
             z-index: 2;
             font-weight: bold;
         }}
@@ -104,27 +110,45 @@ if st.session_state["dati_accumulatori"]:
         unsafe_allow_html=True,
     )
 
-    # Renderizza la tabella avvolta nel contenitore con altezza fissa
+    # Render HTML
     st.markdown(
         f'<div class="table-container">{html_table}</div>',
         unsafe_allow_html=True,
     )
 
+    # Caption informativa
     st.caption(
-        f"Righe attualmente visualizzate: {len(st.session_state['dati_accumulatori'])} | Colonne: {num_colonne}"
+        f"Mostrati record {start_idx + 1} - {min(end_idx, totale_righe)} di {totale_righe} | "
+        f"Pagina {pagina} di {totale_pagine}"
     )
 
-    if st.session_state["has_more"]:
-        if st.button("Carica altre 50 righe"):
-            carica_prossime_righe()
+    # Controlli di navigazione (Precedente / Pagina / Successiva)
+    col_prev, col_page, col_next, _ = st.columns([1, 2, 1, 3])
+
+    with col_prev:
+        if st.button("⬅️ Precedente", disabled=(pagina == 1)):
+            st.session_state["pagina_corrente"] -= 1
             st.rerun()
-    else:
-        st.info("Tutti i dati disponibili sono stati caricati.")
 
+    with col_page:
+        # Permette anche di saltare direttamente a una pagina specifica
+        nuova_pagina = st.number_input(
+            "Pagina",
+            min_value=1,
+            max_value=totale_pagine,
+            value=pagina,
+            label_visibility="collapsed",
+        )
+        if nuova_pagina != pagina:
+            st.session_state["pagina_corrente"] = nuova_pagina
+            st.rerun()
 
+    with col_next:
+        if st.button("Successiva ➡️", disabled=(pagina == totale_pagine)):
+            st.session_state["pagina_corrente"] += 1
+            st.rerun()
+
+# Pulsante di ritorno
 if st.button("Back to Home Page"):
     st.session_state.clear()
-    st.session_state["dati_accumulatori"] = []
-    st.session_state["current_offset"] = 0
-    st.session_state["has_more"] = True
     st.switch_page("pages/home.py")
