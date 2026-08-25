@@ -66,30 +66,31 @@ if st.session_state["tutti_i_dati"]:
     df_pagina = pd.DataFrame(dati_pagina)
 
     num_colonne = len(df_pagina.columns)
-    larghezza_calcolata = f"max(100%, {num_colonne * 140}px)"
     html_table = df_pagina.to_html(classes="fixed-table", index=False)
 
-    # Styling CSS
+    # Styling CSS con Scroll Orizzontale Abilitato e Min-Width
     st.markdown(
         f"""
         <style>
         .table-container {{
             max-height: 500px;
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto; /* Permette lo scorrimento orizzontale */
             border: 1px solid rgba(250, 250, 250, 0.2);
             border-radius: 6px;
             margin-bottom: 10px;
         }}
 
         .fixed-table {{
-            width: {larghezza_calcolata} !important;
-            table-layout: fixed !important;
+            width: 100% !important;
+            min-width: {num_colonne * 140}px; /* Garantisce ampiezza sufficiente per tutte le colonne */
+            table-layout: auto !important;
             border-collapse: collapse;
             font-size: 13px;
         }}
 
         .fixed-table th, .fixed-table td {{
+            min-width: 120px; /* Evita che il testo dell'intestazione venga tagliato */
             word-wrap: break-word !important;
             white-space: normal !important;
             overflow-wrap: break-word !important;
@@ -131,7 +132,6 @@ if st.session_state["tutti_i_dati"]:
             st.rerun()
 
     with col_page:
-        # Permette anche di saltare direttamente a una pagina specifica
         nuova_pagina = st.number_input(
             "Pagina",
             min_value=1,

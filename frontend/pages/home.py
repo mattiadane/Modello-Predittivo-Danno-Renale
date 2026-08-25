@@ -92,30 +92,30 @@ def extract_selected_items(df: pd.DataFrame, selected_labels: list, table_name: 
         for _, row in filtered_df.iterrows()
     ]
 
-
-# --- SEZIONI UI ---
-def render_farmaci() -> list:
-    """Renderizza la selezione farmaci e restituisce in locale le macrocategorie scelte."""
-    with st.container(border=True):
-        st.markdown("### Farmaci")
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            drug_nephro = st.checkbox("Nephrotoxicity drugs", key="drug_nephro")
-        with col2:
-            drug_diuretic = st.checkbox("Diuretic drugs", key="drug_diuretic")
-        with col3:
-            drug_antihyp = st.checkbox("Antihypertensive drugs", key="drug_antihyp")
-
-        selected_drug_groups = []
-        if drug_nephro:
-            selected_drug_groups.append("Nephrotoxicity drugs")
-        if drug_diuretic:
-            selected_drug_groups.append("Diuretic drugs")
-        if drug_antihyp:
-            selected_drug_groups.append("Antihypertensive drugs")
-
-        return selected_drug_groups
+#
+# # --- SEZIONI UI ---
+# def render_farmaci() -> list:
+#     """Renderizza la selezione farmaci e restituisce in locale le macrocategorie scelte."""
+#     with st.container(border=True):
+#         st.markdown("### Farmaci")
+#         col1, col2, col3 = st.columns(3)
+#
+#         with col1:
+#             drug_nephro = st.checkbox("Nephrotoxicity drugs", key="drug_nephro")
+#         with col2:
+#             drug_diuretic = st.checkbox("Diuretic drugs", key="drug_diuretic")
+#         with col3:
+#             drug_antihyp = st.checkbox("Antihypertensive drugs", key="drug_antihyp")
+#
+#         selected_drug_groups = []
+#         if drug_nephro:
+#             selected_drug_groups.append("Nephrotoxicity drugs")
+#         if drug_diuretic:
+#             selected_drug_groups.append("Diuretic drugs")
+#         if drug_antihyp:
+#             selected_drug_groups.append("Antihypertensive drugs")
+#
+#         return selected_drug_groups
 
 
 def render_multiselect(selected_drugs: list) -> tuple[list, list]:
@@ -284,8 +284,8 @@ local_css("frontend/style/style.css")
 st.title("🩺 Prediction of Kidney Injury")
 
 # Passaggio dati puramente in locale tra le funzioni:
-selected_drugs = render_farmaci()
-available_labels, events_objects = render_multiselect(selected_drugs)
+# selected_drugs = render_farmaci()
+available_labels, events_objects = render_multiselect(selected_drugs = [])
 
 # Ora chiediamo SEMPRE granularità ed aggregazione basandoci sui parametri selezionati
 granularity_info = check_granularity(available_labels)
