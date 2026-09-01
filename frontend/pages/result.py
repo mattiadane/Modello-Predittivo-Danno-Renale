@@ -1,3 +1,5 @@
+import uuid
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -14,17 +16,23 @@ if "tutti_i_dati" not in st.session_state:
     st.session_state["tutti_i_dati"] = None
 if "pagina_corrente" not in st.session_state:
     st.session_state["pagina_corrente"] = 1
+if "query_id" not in st.session_state:
+    st.session_state["query_id"] = str(uuid.uuid4()) #generazione id_query casuale
 
+
+
+query_id = st.session_state["query_id"]
 
 def carica_tutti_i_dati():
     """Scarica l'intero dataset in un'unica chiamata."""
     try:
         payload = {"parametri": st.session_state.get("pipeline_input")}
 
+
         # Nessun parametro 'limit' o 'offset' inviato al backend
         with st.spinner("Caricamento completo dei dati in corso..."):
-            response = requests.get(
-                "http://127.0.0.1:8000/AKI", json=payload
+            response = requests.post(
+                f"http://127.0.0.1:8000/AKI/{query_id}", json=payload
             )
 
         if response.status_code == 200:
@@ -39,11 +47,24 @@ def carica_tutti_i_dati():
             st.error(f"Errore dal server ({response.status_code}): {response.text}")
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Impossibile connettersi al backend: {e}")
+        st.error(f"Richiesta interotta",{e})
 
 
 # 2. Caricamento iniziale (eseguito solo la prima volta)
 if st.session_state["tutti_i_dati"] is None:
+
+    if st.button("Annulla la query e torna alla home"):
+        try:
+            response = requests.post(
+                f"http://127.0.0.1:8000/cancel-query/{query_id}"
+            )
+        except Exception as e:
+            st.error(e)
+
+        st.session_state.clear()
+        st.switch_page("pages/home.py")
+
+
     carica_tutti_i_dati()
 
 # 3. Visualizzazione e Paginazione In-Memory

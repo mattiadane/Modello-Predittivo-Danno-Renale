@@ -266,6 +266,9 @@ def prediction_AKI(payload: PipelineInput):
     return query
 
 
+def get_PID():
+    return "SELECT pg_backend_pid()"
+
 
 '''
 if __name__ == "__main__":
