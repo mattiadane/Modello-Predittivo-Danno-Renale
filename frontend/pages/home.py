@@ -1,7 +1,7 @@
 import os
 import pandas as pd
+import requests
 import streamlit as st
-
 
 
 # NEPRO = [
@@ -39,18 +39,6 @@ import streamlit as st
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-VITAL_ITEMIDS = {
-    220180: "Non Invasive Blood Pressure diastolic",
-    220181: "Non Invasive Blood Pressure mean",
-    220179: "Non Invasive Blood Pressure systolic",
-    220050: "Arterial Blood Pressure systolic",
-    220051: "Arterial Blood Pressure diastolic",
-    220052: "Arterial Blood Pressure mean",
-    220074: "Central Venous Pressure",
-    220045: "Heart Rate",
-    220210: "Respiratory Rate",
-    220277: "SpO2"
-}
 
 GRANULARITY_OPTIONS = {
     "1 ora": "1h",
@@ -61,7 +49,7 @@ GRANULARITY_OPTIONS = {
 AGGREGATION_OPTIONS = ["Media", "Minimo", "Massimo"]
 
 
-# --- HELPER PER CARICAMENTO DATI ---
+# Con questo metodo vengono caricati i dati csv una singola volta
 @st.cache_data
 def open_csv(filename: str) -> pd.DataFrame:
     """Carica un file CSV dalla cartella data se esiste."""
@@ -70,6 +58,18 @@ def open_csv(filename: str) -> pd.DataFrame:
         return pd.read_csv(path).dropna(how="all")
     return pd.DataFrame(columns=["itemid", "label"])
 
+# COn questo metodo viene fatta la richiesta API per popolare la lista degli input events una singola volta
+@st.cache_data
+def fetch_inputevents() -> pd.DataFrame:
+    """Recupera gli inputevents dall'API e li salva in cache."""
+    try:
+        response = requests.get("http://127.0.0.1:8000/inputevents")
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())
+    except Exception as e:
+        st.error(f"Errore nel recupero dati dall'API: {e}")
+
+    return pd.DataFrame(columns=["itemid", "label"])
 
 def local_css(file_name: str):
     """Carica eventuali stili CSS personalizzati."""
@@ -101,22 +101,28 @@ def render_farmaci() -> list:
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            drug_nephro = st.checkbox("Nephrotoxicity drugs", key="drug_nephro")
-            drug_diuretic = st.checkbox("Diuretic drugs", key="drug_diuretic")
+            drug_nephro = st.checkbox("Nefrotossici", key="Nefrotossici")
+            drug_diuretic = st.checkbox("Diuretici", key="Diuretici")
         with col2:
-            drug_antihyp = st.checkbox("Antihypertensive drugs", key="drug_antihyp")
-            drug_a = st.checkbox("drugs_a",key="drugs_a")
+            drug_antihyp = st.checkbox("Antipertensivi", key="Antipertensivi")
+            drug_chemio = st.checkbox("Chemioterapici",key="Chemioterapici")
         with col3:
-            drug_b = st.checkbox("drugs_b",key="drugs_b")
-            drug_c = st.checkbox("drugs_c", key="drugs_c")
+            drug_fans = st.checkbox("Fans",key="Fans")
+            drug_dopa = st.checkbox("Dopamine", key="Dopamine")
 
         selected_drug_groups = []
         if drug_nephro:
-            selected_drug_groups.append("Nephrotoxicity drugs")
+            selected_drug_groups.append("Nefrotossici")
         if drug_diuretic:
-            selected_drug_groups.append("Diuretic drugs")
+            selected_drug_groups.append("Diuretici")
         if drug_antihyp:
-            selected_drug_groups.append("Antihypertensive drugs")
+            selected_drug_groups.append("Antipertensivi")
+        if drug_chemio:
+            selected_drug_groups.append("Chemioterapici")
+        if drug_fans:
+            selected_drug_groups.append("Fans")
+        if drug_dopa:
+            selected_drug_groups.append("Dopamine")
 
         return selected_drug_groups
 
@@ -132,9 +138,12 @@ def render_multiselect(selected_drugs: list) -> tuple[list, list]:
         st.markdown("### Eventi Clinici")
         col1, col2, col3 = st.columns(3)
 
+
         chartevents_df = open_csv("first200chartevents.csv")
         outputevents_df = open_csv("outputevents.csv")
-        inputevents_df = open_csv("first200inputevents.csv")
+
+        inputevents_df = fetch_inputevents()
+
         procedures_df = open_csv("first200procedures.csv")
         labevents_df = open_csv("first200labevents.csv")
 
@@ -146,7 +155,7 @@ def render_multiselect(selected_drugs: list) -> tuple[list, list]:
             all_events_objects.extend(extract_selected_items(chartevents_df, labels_chart, "chartevents"))
             current_labels.extend(labels_chart)
 
-            labels_input = st.multiselect("Inputevents", inputevents_df["label"].tolist(), key="ms_input")
+            labels_input = st.multiselect("Inputevents",inputevents_df["label"].tolist(), key="ms_input")
             all_events_objects.extend(extract_selected_items(inputevents_df, labels_input, "inputevents"))
             current_labels.extend(labels_input)
 

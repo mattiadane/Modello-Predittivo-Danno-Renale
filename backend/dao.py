@@ -266,6 +266,16 @@ def prediction_AKI(payload: PipelineInput):
     return query
 
 
+
+def get_inputevents():
+    return "SELECT * FROM droplist_inputevents"
+
+
+def kill_query(pid):
+    return f"SELECT pg_cancel_backend({pid})"
+
+
+
 def get_PID():
     return "SELECT pg_backend_pid()"
 

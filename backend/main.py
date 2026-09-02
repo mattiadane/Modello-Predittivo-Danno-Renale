@@ -69,7 +69,7 @@ def root(
         active_queries.pop(query_id,None)
 
 
-@app.post("/cancel-query/{query_id}")
+@app.delete("/cancel-query/{query_id}")
 def cancel_query(query_id : str, session: Session = Depends(get_db)):
 
     if params is None:
@@ -83,8 +83,20 @@ def cancel_query(query_id : str, session: Session = Depends(get_db)):
 
     if db_pid:
         # Invia il comando KILL/CANCEL a Postgres
-        session.execute(text(f"SELECT pg_cancel_backend({db_pid})"))
+        session.execute(text(dao.kill_query(db_pid)))
         session.commit()
         return {"status": "Query interrotta"}
 
     return {"status": "Query non trovata"}
+
+
+@app.get("/inputevents")
+def get_inputevents(session : Session = Depends(get_db)):
+    sql = dao.get_inputevents()
+
+    result = session.execute(text(sql)).mappings().all()
+
+    if not result:
+        return []
+
+    return [dict(r) for r in result]
