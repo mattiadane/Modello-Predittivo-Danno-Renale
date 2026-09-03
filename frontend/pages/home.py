@@ -4,41 +4,16 @@ import requests
 import streamlit as st
 
 
-# NEPRO = [
-#     "Gentamicin", "Vancomycin", "Tobramycin", "Amikacin", "Penicillamine",
-#     "Auranofin", "Sulfamethoxazole", "Trimethoprim", "Sulfametrole",
-#     "Sulfamazone", "Streptomycin", "Netilmicin", "Zoledronate", "Colistin",
-#     "Acyclovir", "Foscavir", "Ganciclovir", "Adefovir", "Tenofovir",
-#     "Indinavir", "Cidofovir", "Cyclosporine", "Tacrolimus", "Carmustine",
-#     "Mutamycin", "Prevacid", "Pamidronate"
-# ]
-#
-# DIUR = [
-#     "Furosemide", "Triamterene", "Hydrochlorothiazide", "Indapamide",
-#     "Spironolactone", "Tolvaptan", "Chlorothiazide", "Bumetanide",
-#     "Amiloride", "Metolazone", "Eplerenone", "Chlorthalidone",
-#     "Torsemide", "Aldactone", "Ethacrynic acid", "Acetazolamide"
-# ]
-#
-# ANTIPER = [
-#     "Nebivolol", "Moexipril", "Sotalol", "Lisinopril", "Carvedilol",
-#     "Methyldopa", "Propranolol", "Benazepril", "Aliskiren", "Ambrisentan",
-#     "Clonidine", "Pindolol", "Bosentan", "Minoxidil", "Irbesartan",
-#     "Prazosin", "Quinapril", "Doxazosin", "Atenolol", "Diazoxide",
-#     "Metoprolol", "Esmolol", "Candesartan", "Nadolol", "Losartan",
-#     "Captopril", "Valsartan", "Trandolapril", "Acebutolol", "Ramipril",
-#     "Macitentan", "Guanfacine"
-# ]
-#
-# DRUG_GROUPS_MAP = {
-#     "Nephrotoxicity drugs": NEPRO,
-#     "Diuretic drugs": DIUR,
-#     "Antihypertensive drugs": ANTIPER
-# }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
+
+GROUP_TABLE = ["chartevents", "labevents", "outputevents"]
+
+
+
+DRUG_GROUPS = ["Nefrotossici","Diuretici","Antipertensivi","Chemioterapici","Fans","Dopamine"]
 
 GRANULARITY_OPTIONS = {
     "1 ora": "1h",
@@ -71,6 +46,7 @@ def fetch_inputevents() -> pd.DataFrame:
 
     return pd.DataFrame(columns=["itemid", "label"])
 
+
 def local_css(file_name: str):
     """Carica eventuali stili CSS personalizzati."""
     try:
@@ -87,10 +63,22 @@ def extract_selected_items(df: pd.DataFrame, selected_labels: list, table_name: 
         {
             "tabella": table_name,
             "id": int(row["itemid"]),
-            "parametro": str(row["label"])
+            "parametro": str(row["label"]),
+            "granularita": None,
+            "aggregazione": None
         }
         for _, row in filtered_df.iterrows()
     ]
+
+
+def create_map_for_drugs(type_drug : str) -> dict:
+    return {
+        "tabella" : "prescription",
+        "id" : None,
+        "parametro" : type_drug,
+        "granularita": None,
+        "aggregazione": None
+    }
 
 
 # --- SEZIONI UI ---
@@ -110,24 +98,23 @@ def render_farmaci() -> list:
             drug_fans = st.checkbox("Fans",key="Fans")
             drug_dopa = st.checkbox("Dopamine", key="Dopamine")
 
-        selected_drug_groups = []
+        selected_drug_groups =  []
         if drug_nephro:
-            selected_drug_groups.append("Nefrotossici")
+            selected_drug_groups.append(create_map_for_drugs("Nefrotossico"))
         if drug_diuretic:
-            selected_drug_groups.append("Diuretici")
+            selected_drug_groups.append(create_map_for_drugs("Diuretico"))
         if drug_antihyp:
-            selected_drug_groups.append("Antipertensivi")
+            selected_drug_groups.append(create_map_for_drugs("Antipertensivo"))
         if drug_chemio:
-            selected_drug_groups.append("Chemioterapici")
+            selected_drug_groups.append(create_map_for_drugs("Chemioterapico"))
         if drug_fans:
-            selected_drug_groups.append("Fans")
+            selected_drug_groups.append(create_map_for_drugs("Fans"))
         if drug_dopa:
-            selected_drug_groups.append("Dopamine")
+            selected_drug_groups.append(create_map_for_drugs("Dopamina"))
 
         return selected_drug_groups
 
-
-def render_multiselect(selected_drugs: list) -> tuple[list, list]:
+def render_multiselect(selected_drugs: list) -> list:
     """
     Renderizza i multiselect per gli eventi clinici.
     Restituisce in locale:
@@ -147,60 +134,86 @@ def render_multiselect(selected_drugs: list) -> tuple[list, list]:
         procedures_df = open_csv("first200procedures.csv")
         labevents_df = open_csv("first200labevents.csv")
 
-        current_labels = list(selected_drugs)
-        all_events_objects = []
+
+        all_events_objects = list(selected_drugs)
+
 
         with col1:
             labels_chart = st.multiselect("Chartevents", chartevents_df["label"].tolist(), key="ms_chart")
             all_events_objects.extend(extract_selected_items(chartevents_df, labels_chart, "chartevents"))
-            current_labels.extend(labels_chart)
 
             labels_input = st.multiselect("Inputevents",inputevents_df["label"].tolist(), key="ms_input")
             all_events_objects.extend(extract_selected_items(inputevents_df, labels_input, "inputevents"))
-            current_labels.extend(labels_input)
 
         with col2:
             labels_output = st.multiselect("Outputevents", outputevents_df["label"].tolist(), key="ms_output")
             all_events_objects.extend(extract_selected_items(outputevents_df, labels_output, "outputevents"))
-            current_labels.extend(labels_output)
 
         with col3:
             labels_lab = st.multiselect("Labevents", labevents_df["label"].tolist(), key="ms_lab")
             all_events_objects.extend(extract_selected_items(labevents_df, labels_lab, "labevents"))
-            current_labels.extend(labels_lab)
 
             labels_proc = st.multiselect("Procedures", procedures_df["label"].tolist(), key="ms_proc")
             all_events_objects.extend(extract_selected_items(procedures_df, labels_proc, "procedureevents"))
-            current_labels.extend(labels_proc)
 
-        # Rimuove duplicati mantenendo l'ordine
-        available_labels = list(dict.fromkeys(current_labels))
-        return available_labels, all_events_objects
+        return  all_events_objects
+
+def render_window() -> dict:
 
 
-def check_granularity(available_options: list) -> dict | None:
-    """Mostra la configurazione di granularità se è stato selezionato almeno un parametro o farmaco."""
-    if not available_options:
+    with st.container(border=True):
+        st.markdown("### Dimensioni finestre")
+        col1, col2, col3 = st.columns(3)
+
+        with col1 :
+            ow = st.number_input(
+                "Dimensione Observation Window",
+                min_value=1,
+                step=1
+            )
+        with col2 :
+            ww = st.number_input(
+                "Dimensione Waiting Window",
+                min_value=0,
+                step=1
+            )
+        with col3 :
+            pw = st.number_input(
+                "Dimensione Prediction Window",
+                min_value=1,
+                step=1
+            )
+
+    return {
+        "ow": ow,
+        "ww": ww,
+        "pw": pw,
+    }
+
+def check_granularity(object_events) -> dict | None:
+    """Mostra la configurazione di granularità se è stato selezionato almeno un parametro tra chartevents, labevents,outputevents"""
+
+
+    if not any(event.get("tabella") in GROUP_TABLE  for event in object_events):
         return None
 
-    st.write("---")
-    st.write("**Configurazione Parametri:**")
-    col_g, col_a = st.columns(2)
-
-    with col_g:
-        gran_label = st.selectbox(
-            "Granularità",
-            options=list(GRANULARITY_OPTIONS.keys()),
-            index=2,
-            key="sb_gran"
-        )
-    with col_a:
-        agg_label = st.selectbox(
-            "Aggregazione",
-            options=AGGREGATION_OPTIONS,
-            index=0,
-            key="sb_agg"
-        )
+    with st.container(border=True):
+        st.markdown("### Configurazione Parametri:")
+        col_g, col_a = st.columns(2)
+        with col_g:
+            gran_label = st.selectbox(
+                "Granularità",
+                options=list(GRANULARITY_OPTIONS.keys()),
+                index=2,
+                key="sb_gran",
+            )
+        with col_a:
+            agg_label = st.selectbox(
+                "Aggregazione",
+                options=AGGREGATION_OPTIONS,
+                index=0,
+                key="sb_agg"
+            )
 
     return {
         "granularita": GRANULARITY_OPTIONS[gran_label],
@@ -208,24 +221,37 @@ def check_granularity(available_options: list) -> dict | None:
     }
 
 
-def render_ordering_section(available_options: list, events_objects: list, granularity_info: dict | None):
+def render_ordering_section(events_objects: list, granularity_info: dict | None,windows_info: dict ) :
     """
     Costruisce l'interfaccia di riordino e salva DIRETTAMENTE in st.session_state['pipeline_input']
-    l'unico array finale completo di cui hai bisogno.
+    l'unico array finale completo
     """
-    if not available_options:
+
+    # Mappa veloce locale: Nome Parametro -> Oggetto Evento
+    item_lookup_map = {item["parametro"]: item for item in events_objects}
+    current_keys = list(item_lookup_map.keys())
+
+    if not current_keys:
         st.session_state["pipeline_input"] = []
-        if "feature_sorter" in st.session_state:
-            st.session_state.feature_sorter = []
+        st.session_state["feature_sorter"] = []
+        st.session_state["prev_current_keys"] = []
         return
 
-    # Sincronizzazione locale del widget multiselect
+        # Inizializzazione dello stato al primo avvio
     if "feature_sorter" not in st.session_state:
-        st.session_state.feature_sorter = available_options.copy()
+        st.session_state["feature_sorter"] = current_keys
+        st.session_state["prev_current_keys"] = current_keys
     else:
-        st.session_state.feature_sorter = [
-            item for item in st.session_state.feature_sorter if item in available_options
-        ]
+        prev_keys = st.session_state.get("prev_current_keys", [])
+
+
+        brand_new_keys = [k for k in current_keys if k not in prev_keys]
+
+        current_sorter = [k for k in st.session_state["feature_sorter"] if k in current_keys]
+
+        st.session_state["feature_sorter"] = current_sorter + brand_new_keys
+
+        st.session_state["prev_current_keys"] = current_keys
 
     with st.container(border=True):
         st.markdown("### Ordina le tue Feature (Macro-Farmaci ed Eventi)")
@@ -233,41 +259,29 @@ def render_ordering_section(available_options: list, events_objects: list, granu
 
         ordered_labels = st.multiselect(
             "Seleziona o reinserisci nell'ordine desiderato:",
-            options=available_options,
+            options=current_keys,
             key="feature_sorter"
         )
 
-        # Mappa veloce locale: Nome Parametro -> Oggetto Evento
-        item_lookup_map = {item["parametro"]: item for item in events_objects}
 
         # Costruzione dell'UNICO array che servirà al backend
         final_ordered_features = []
         for label in ordered_labels:
-            feature_data = {}
 
 
-            # Caso Farmaco
-            # if label in DRUG_GROUPS_MAP:
-            #     feature_data = {
-            #         "tabella": "farmaci",
-            #         "parametro": label,
-            #         "items": DRUG_GROUPS_MAP[label]
-            #     }
-            #
-            # Caso Evento Clinico
-            if label in item_lookup_map:
-                feature_data = item_lookup_map[label].copy()
+            feature_data = item_lookup_map[label].copy()
 
-            # Aggiunge SEMPRE granularità e aggregazione a tutti i parametri selezionati
-            if feature_data and granularity_info:
+
+            if granularity_info and item_lookup_map[label]["tabella"] in GROUP_TABLE:
                 feature_data["granularita"] = granularity_info["granularita"]
                 feature_data["aggregazione"] = granularity_info["aggregazione"]
-
-            if feature_data:
-                final_ordered_features.append(feature_data)
+            final_ordered_features.append(feature_data)
 
         # SALVIAMO UNICAMENTE L'ARRAY FINALE PER IL BACKEND
-        st.session_state["pipeline_input"] = final_ordered_features
+        st.session_state["pipeline_input"] = {
+            "windows" : windows_info,
+            "features" : final_ordered_features
+        }
 
         if ordered_labels:
             st.markdown("**Ordine finale per l'addestramento:**")
@@ -283,7 +297,7 @@ def render_button():
         if st.button("Elabora Modello",width='stretch', type="primary"):
             pipeline_data = st.session_state.get("pipeline_input", [])
 
-            if not pipeline_data or (len(pipeline_data) < 3 or len(pipeline_data) > 6):
+            if not pipeline_data or (len(pipeline_data["features"]) < 3 or len(pipeline_data["features"]) > 6):
                 st.warning("Seleziona dai 3 ai 6 parametri")
                 return
 
@@ -297,11 +311,12 @@ st.title("🩺 Prediction of Kidney Injury")
 
 # Passaggio dati puramente in locale tra le funzioni:
 selected_drugs = render_farmaci()
-available_labels, events_objects = render_multiselect(selected_drugs = [])
+events_objects = render_multiselect(selected_drugs)
 
-# Ora chiediamo SEMPRE granularità ed aggregazione basandoci sui parametri selezionati
-granularity_info = check_granularity(available_labels)
+windows = render_window()
+
+granularity_info = check_granularity(events_objects)
 
 # Assembly finale direttamente in session_state['pipeline_input']
-render_ordering_section(available_labels, events_objects, granularity_info)
+render_ordering_section(events_objects, granularity_info,windows)
 render_button()

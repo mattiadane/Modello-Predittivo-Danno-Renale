@@ -1,7 +1,7 @@
 from sqlalchemy.exc import OperationalError, DBAPIError
 
 from backend.schema import PipelineInput
-from fastapi import Depends, FastAPI, HTTPException, Query, status, params
+from fastapi import Depends, FastAPI, HTTPException, status, params
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 

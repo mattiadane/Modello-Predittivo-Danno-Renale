@@ -29,7 +29,7 @@ url = URL.create(
     username="Mattia Danese",
     password=PASSWORD,
     host=HOST,
-    port=int(PORT) if PORT else 5432,
+    port=int(PORT) if PORT else 5433,
     database=DATABASE,
 )
 

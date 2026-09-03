@@ -14,15 +14,17 @@ if "tutti_i_dati" not in st.session_state:
 if "pagina_corrente" not in st.session_state:
     st.session_state["pagina_corrente"] = 1
 if "query_id" not in st.session_state:
-    st.session_state["query_id"] = str(uuid.uuid4())
+    st.session_state["query_id"] = str(uuid.uuid4()) #generazione casuale di un query_id
 
 query_id = st.session_state["query_id"]
 
 
 def carica_tutti_i_dati():
     """Scarica il dataset mostrando il pulsante di annullamento SOLO durante l'esecuzione."""
-    payload = {"parametri": st.session_state.get("pipeline_input")}
+    payload = {"windows":st.session_state.get("pipeline_input")["windows"],"parametri": st.session_state.get("pipeline_input")["features"]}
 
+
+    print(payload)
     # Creiamo un container temporaneo che sparirà appena i dati saranno pronti
     loading_container = st.empty()
 
