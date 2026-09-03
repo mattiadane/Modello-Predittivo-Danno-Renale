@@ -93,7 +93,6 @@ def first_tmpv(first_param: ParametroConfig,windows : WindowsConfig):
     else :
         select_fields.append("valid_time AS t_0")
 
-    param_as.append("t_0")
 
     select_fields.append(f"(MIN(valid_time) + INTERVAL '{windows.ow} hours') AS end_ow")
 
@@ -102,6 +101,9 @@ def first_tmpv(first_param: ParametroConfig,windows : WindowsConfig):
         select_fields.append(config["label"])
         param_as.append(config["label"])
         group_fields.append(config["label"])
+
+    param_as.append("t_0")
+
 
 
     field_str = ", ".join(select_fields)
@@ -184,8 +186,6 @@ def n_tmpv(idx: int, param: ParametroConfig, param_prec : ParametroConfig,ctePre
     else :
         select_fields.append(f"{subname}.valid_time AS t_{idx - 1}")
 
-    param_as.append(f"t_{idx-1}")
-
 
 
 
@@ -193,6 +193,10 @@ def n_tmpv(idx: int, param: ParametroConfig, param_prec : ParametroConfig,ctePre
         select_fields.append(f"{subname}.{config['label']}")
         param_as.append(config["label"])
         group_fields.append(f"{subname}.{config['label']}")
+
+    param_as.append(f"t_{idx-1}")
+
+
 
 
     field_str = ", ".join(select_fields)
