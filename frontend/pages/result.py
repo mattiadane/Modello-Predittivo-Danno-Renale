@@ -14,29 +14,29 @@ if "tutti_i_dati" not in st.session_state:
 if "pagina_corrente" not in st.session_state:
     st.session_state["pagina_corrente"] = 1
 if "query_id" not in st.session_state:
-    st.session_state["query_id"] = str(uuid.uuid4()) #generazione casuale di un query_id
+    st.session_state["query_id"] = str(uuid.uuid4())
+if "errore_query" not in st.session_state:
+    st.session_state["errore_query"] = None
 
 query_id = st.session_state["query_id"]
 
 
 def carica_tutti_i_dati():
     """Scarica il dataset mostrando il pulsante di annullamento SOLO durante l'esecuzione."""
-    payload = {"windows":st.session_state.get("pipeline_input")["windows"],"parametri": st.session_state.get("pipeline_input")["features"]}
+    payload = {
+        "windows": st.session_state.get("pipeline_input", {}).get("windows", []),
+        "parametri": st.session_state.get("pipeline_input", {}).get("features", {}),
+    }
 
-
-    print(payload)
-    # Creiamo un container temporaneo che sparirà appena i dati saranno pronti
     loading_container = st.empty()
 
     with loading_container.container():
         st.info("🕒 Elaborazione query in corso...")
 
-        # Pulsante ANNULLA visibile ESCLUSIVAMENTE mentre i dati sono None (in caricamento)
+        # Pulsante ANNULLA visibile ESCLUSIVAMENTE mentre i dati sono in caricamento
         if st.button("🚫 Annulla la query e torna alla home", key="btn_cancel"):
             try:
-                requests.delete(
-                    f"http://127.0.0.1:8000/cancel-query/{query_id}"
-                )
+                requests.delete(f"http://127.0.0.1:8000/cancel-query/{query_id}")
             except Exception as e:
                 st.error(f"Errore durante l'annullamento: {e}")
 
@@ -45,39 +45,50 @@ def carica_tutti_i_dati():
 
         # Chiamata HTTP
         try:
-
             response = requests.post(
                 f"http://127.0.0.1:8000/AKI/{query_id}", json=payload
             )
 
             if response.status_code == 200:
                 dati = response.json()
-                if dati:
-                    st.session_state["tutti_i_dati"] = dati
-                    st.session_state["pagina_corrente"] = 1
-                else:
-                    st.session_state["tutti_i_dati"] = []
+                st.session_state["tutti_i_dati"] = dati if dati else []
+                st.session_state["pagina_corrente"] = 1
+                st.session_state["errore_query"] = None
+                esito =  True
             else:
-                st.error(
+                st.session_state["errore_query"] = (
                     f"Errore dal server ({response.status_code}): {response.text}"
                 )
-                st.session_state["tutti_i_dati"] = []
+                esito =  False
 
-        except requests.exceptions.RequestException:
-            st.error("Richiesta interrotta o errore di connessione.")
-            st.session_state["tutti_i_dati"] = []
+        except requests.exceptions.RequestException as e:
+            st.session_state["errore_query"] = (
+                f"Richiesta interrotta o errore di connessione: {e}"
+            )
+            esito =  False
 
-    # Puliamo il container per far Scomparire il pulsante di annullamento
     loading_container.empty()
+    return esito
 
 
-# Esecuzione Caricamento (Solo se non abbiamo ancora i dati)
-if st.session_state["tutti_i_dati"] is None:
-    carica_tutti_i_dati()
-    st.rerun()  # Riavvia lo script per aggiornare l'interfaccia senza il loader
+# Esecuzione Caricamento (Solo se non abbiamo ancora dati né errori)
+if st.session_state["tutti_i_dati"] is None and st.session_state["errore_query"] is None:
+    successo = carica_tutti_i_dati()
+    if successo:
+        st.rerun()
 
-# Visualizzazione Dati e Paginazione
-if st.session_state["tutti_i_dati"] is not None:
+# 2. Gestione in caso di ERRORE HTTP / Connessione
+if st.session_state["errore_query"] is not None:
+    st.error(st.session_state["errore_query"])
+
+    col_home, _ = st.columns([1, 4])
+    with col_home:
+        if st.button("🏠 Torna alla Home Page"):
+            st.session_state.clear()
+            st.switch_page("pages/home.py")
+
+# 3. Visualizzazione Dati e Paginazione (Se non ci sono errori)
+elif st.session_state["tutti_i_dati"] is not None:
 
     if len(st.session_state["tutti_i_dati"]) == 0:
         st.warning(
@@ -88,7 +99,6 @@ if st.session_state["tutti_i_dati"] is not None:
 
         tutti_i_dati = st.session_state["tutti_i_dati"]
 
-
         totale_righe = len(tutti_i_dati)
         totale_pagine = max(1, (totale_righe + PAGE_SIZE - 1) // PAGE_SIZE)
 
@@ -97,7 +107,6 @@ if st.session_state["tutti_i_dati"] is not None:
         end_idx = start_idx + PAGE_SIZE
 
         dati_pagina = tutti_i_dati[start_idx:end_idx]
-
 
         df_pagina = pd.DataFrame(dati_pagina)
         df_dati = pd.DataFrame(tutti_i_dati)
@@ -156,7 +165,7 @@ if st.session_state["tutti_i_dati"] is not None:
         )
 
         # Controlli Paginazione
-        col_prev, col_page, col_next, col_csv_all,col_csv_pag ,_ = st.columns([1, 2, 1, 1 ,1,3])
+        col_prev, col_page, col_next, col_csv_all, col_csv_pag, _ = st.columns([1, 2, 1, 1, 1, 3])
 
         with col_prev:
             if st.button("⬅️ Precedente", disabled=(pagina == 1)):
@@ -186,15 +195,16 @@ if st.session_state["tutti_i_dati"] is not None:
                 label="Scarica tutti i dati",
                 data=csv_all,
                 file_name="allData.csv",
-                mime="text/csv"
+                mime="text/csv",
             )
+
         with col_csv_pag:
             csv_pagina = df_pagina.to_csv(index=False).encode("utf-8")
             st.download_button(
                 label=f"Scarica dati {pagina}° pagina",
                 data=csv_pagina,
                 file_name=f"{pagina}°pagina.csv",
-                mime="text/csv"
+                mime="text/csv",
             )
 
     # Pulsante per tornare alla home

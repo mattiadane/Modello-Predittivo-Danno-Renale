@@ -73,7 +73,7 @@ def extract_selected_items(df: pd.DataFrame, selected_labels: list, table_name: 
 
 def create_map_for_drugs(type_drug : str) -> dict:
     return {
-        "tabella" : "prescription",
+        "tabella" : "prescriptions",
         "id" : None,
         "parametro" : type_drug,
         "granularita": None,
