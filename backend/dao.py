@@ -73,17 +73,17 @@ def first_tmpv(first_param: ParametroConfig, windows: WindowsConfig):
     if first_param.tabella not in ("labevents", "prescriptions"):
         select_fields.append("stay_id")
         group_fields.append("stay_id")
-        param_as.append("stay_id")
         select_fields.append("hadm_id")
         group_fields.append("hadm_id")
     else :
         subname = first_param.tabella[0:2]
         select_fields.append("ic.stay_id")
         group_fields.append("ic.stay_id")
-        param_as.append("stay_id")
         select_fields.append("ic.hadm_id")
         group_fields.append("ic.hadm_id")
-        where_fields.append(f"starttime BETWEEN ic.intime and ic.outtime")
+        is_lab = first_param.tabella == "labevents"
+        time = "valid_time" if is_lab else "starttime"
+        where_fields.append(f"{time} BETWEEN ic.intime and ic.outtime")
 
 
 
@@ -99,10 +99,10 @@ def first_tmpv(first_param: ParametroConfig, windows: WindowsConfig):
         if config['value']:
             alias = sql_alias(first_param.parametro)
             select_fields.append(
-                f"{AGGREGATION_OPTIONS[first_param.aggregazione]}({config['value']}) AS {alias}"
+                f"{AGGREGATION_OPTIONS[first_param.aggregazione]}(ROUND({config['value']}::NUMERIC,2)) AS {alias}"
             )
             param_as.append(first_param.parametro)
-            where_fields.append(f"{config['value']} IS NOT NULL")
+            where_fields.append(f"ROUND({config['value']}::NUMERIC,2) IS NOT NULL")
             select_fields.append(f"(MIN(valid_time) + INTERVAL '{windows.ow} hours') AS end_ow")
 
     else:
@@ -138,7 +138,7 @@ def first_tmpv(first_param: ParametroConfig, windows: WindowsConfig):
         f"WITH {NAME_VIEW[1]} AS (\n"
         f" SELECT {field_str}\n"
         f" FROM {C}{first_param.tabella}{f' {subname}' if first_param.tabella in ('labevents', 'prescriptions') else ''}\n"
-        f"{f' INNER JOIN mimic_iv_2_2_untouched.icustays ic ON {subname}.hadm_id = ic.hadm_id' if first_param.tabella in ('labevents', 'prescriptions') else ''}\n"
+        f"{f' INNER JOIN mimic_iv_2_2_untouched.icustays ic ON {subname}.hadm_id = ic.hadm_id\n' if first_param.tabella in ('labevents', 'prescriptions') else ''}"
         f" WHERE {where_str}\n"
         f" GROUP BY {group_str}\n"
         f")"
@@ -195,12 +195,11 @@ def n_tmpv(idx: int, param: ParametroConfig, param_prec: ParametroConfig, ctePre
         if config['value']:
             alias = sql_alias(param.parametro)
             select_fields.append(
-                f"{AGGREGATION_OPTIONS[param.aggregazione]}({subname}.{config['value']}) AS {alias}"
+                f"{AGGREGATION_OPTIONS[param.aggregazione]}(ROUND({subname}.{config['value']}::NUMERIC,2)) AS {alias}"
             )
             param_as.append(param.parametro)
-            where_fields.append(f"{subname}.{config['value']} IS NOT NULL")
+            where_fields.append(f"ROUND({subname}.{config['value']}::NUMERIC,2) IS NOT NULL")
     else:
-
         time_col = "starttime" if param.tabella == "prescriptions" else "valid_time"
 
         select_fields.append(f"{subname}.{time_col} AS t_{idx - 1}")
@@ -254,21 +253,13 @@ def final_query(diz) -> str:
             if val.startswith("t_"):
                 order_fields.append(f"{subname}.{val}")
             select_fields.append(f"{subname}.{sql_alias(val)}")
-        if count == 1:
-            if "stay_id" in value:
-                join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id")
-            else:
-                join_fields.append(f"INNER JOIN {key} f{count} ON sp.hadm_id = f{count}.hadm_id")
-
-
-        else:
-            join_conditions = []
-            var = count - 2
-            while var >= 0:
-                join_conditions.append(f"f{count}.t_{var} = f{count - 1}.t_{var}")
-                var -= 1
-            join_strs = " AND ".join(join_conditions)
-            join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id AND {join_strs}")
+        join_conditions = []
+        var = count - 2
+        while var >= 0:
+            join_conditions.append(f"f{count}.t_{var} = f{count - 1}.t_{var}")
+            var -= 1
+        join_strs = " AND ".join(join_conditions)
+        join_fields.append(f"INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id {f'AND {join_strs}'if count > 1 else ''}")
         count += 1
 
     field_str = ", ".join(select_fields)
