@@ -12,20 +12,28 @@ Sistema per la predizione dell'**Acute Kidney Injury (AKI)** basato su un approc
 
 ---
 
-## ⚙️ Funzionalità Principali
+## ⚙️ Funzionalità Pagina Home
 
 * **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali.
-* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici e riordinarli a proprio piacimento nell'interfaccia.
+* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici e riordinarli nell'interfaccia.
 * **Granularità e Aggregazione:** Per i parametri estratti dalle tabelle cliniche (`chartevents`, `labevents`, `outputevents`), l'utente può definire la granularità temporale dell'evento e la relativa funzione di aggregazione (es. media, massimo, minimo).
+
+---
+
+## ⚙️ Funzionalità Pagina Result
+
+* **Visualizzazione dei risultati tramite paginazione:** Consultazione dei risultati clinici dall'istante $t_0$ del primo parametro al $t_{aki}$ (tempo di insorgenza dello stadio AKI), rispettando i vincoli temporali delle tre finestre.
+* **Interruzione della query:** Pulsante dedicato per interrompere l'esecuzione dell'estrazione dati e tornare alla Home Page.
+* **Esportazione dati in CSV:** Download dell'intero dataset di output o della sola pagina corrente (50 righe).
 
 ---
 
 ## 🛠️ Stack Tecnologico
 
-* **Linguaggio:** Python 3.12.3
+* **Linguaggio:** Python 3.12+
 * **Front-end:** Streamlit 1.59.2
 * **Back-end:** FastAPI 0.139.2
-* **Database:** PostgreSQL
+* **Database:** PostgreSQL (MIMIC-IV v2.2)
 * **Librerie Principali:** SQLAlchemy 2.0.51, Pandas 3.0.3, Pydantic 2.13.4, Requests 2.34.2, Python-dotenv 1.2.2, Uvicorn 0.51.0, Psycopg2-binary 2.9.12
 
 ---
@@ -37,7 +45,7 @@ Modello-Predittivo-Danno-Renale/
 ├── backend/                  # Componenti server e logica di accesso ai dati
 │   ├── .env                  # Variabili d'ambiente e configurazioni riservate
 │   ├── __init__.py           # Inizializzazione del modulo backend
-│   ├── connection.py         # Configurazione e gestione connessione al Database
+│   ├── connection.py        # Configurazione e gestione connessione al Database
 │   ├── dao.py                # Data Access Object (generazione e scrittura delle query)
 │   ├── main.py               # Entry point backend (FastAPI / Server)
 │   └── schema.py             # Schemi di validazione dati (Pydantic / SQLAlchemy)
