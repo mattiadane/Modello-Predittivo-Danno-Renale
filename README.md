@@ -6,9 +6,14 @@ Sistema per la predizione dell'**Acute Kidney Injury (AKI)** basato su un approc
 
 ## ⏳ Logica a 3 Finestre Temporali
 
-* **Observation Window:** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata e seleziona da 3 a 6 parametri clinici da monitorare (es. farmaci, parametri vitali, esami di laboratorio).
+* **Observation Window:** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata e seleziona da 3 a 6 parametri clinici da monitorare (es. farmaci, parametri vitali, esami di laboratorio ecc).
 * **Waiting Window:** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
 * **Prediction Window:** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
+
+> 📌 **Vincolo Temporale dei Dati:**  
+> Tutti i parametri e gli eventi clinici estratti e analizzati lungo le finestre rispettano rigorosamente la sequenza cronologica:  
+> $$t_0 < t_1 < t_2 < \dots < t_n < t_{aki}$$  
+> dove $t_0$ rappresenta la prima rilevazione clinica e $t_{aki}$ il momento dell'eventuale classificazione dello stadio AKI.
 
 ---
 
