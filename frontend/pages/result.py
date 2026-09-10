@@ -3,17 +3,21 @@ import pandas as pd
 import requests
 import streamlit as st
 
+# --- Configurazione Iniziale della Pagina ---
 st.set_page_config(page_title="Result of query", layout="wide")
 st.title("Result of query")
 
+# Dimensione fissa per la paginazione delle righe nella tabella
 PAGE_SIZE = 50
 
-# 1. Inizializzazione Session State
+# ---  Inizializzazione dello Stato della Sessione (st.session_state) ---
+# Mantiene lo stato tra i vari rerun generati dalle interazioni dell'utente
 if "tutti_i_dati" not in st.session_state:
     st.session_state["tutti_i_dati"] = None
 if "pagina_corrente" not in st.session_state:
     st.session_state["pagina_corrente"] = 1
 if "query_id" not in st.session_state:
+    # Identificativo univoco generato per tracciare/annullare la richiesta HTTP specifica
     st.session_state["query_id"] = str(uuid.uuid4())
 if "errore_query" not in st.session_state:
     st.session_state["errore_query"] = None
@@ -21,19 +25,25 @@ if "errore_query" not in st.session_state:
 query_id = st.session_state["query_id"]
 
 
+# --- Funzione per il Recupero Dati ---
 def carica_tutti_i_dati():
-    """Scarica il dataset mostrando il pulsante di annullamento SOLO durante l'esecuzione."""
+    """Effettua la chiamata API REST al backend FastAPI per elaborare e scaricare i dati.
+
+    Mostra un feedback visivo e un pulsante di annullamento per la richiesta.
+    """
+    # Estrazione dei parametri inseriti dall'utente nella home
     payload = {
         "windows": st.session_state.get("pipeline_input", {}).get("windows", []),
         "parametri": st.session_state.get("pipeline_input", {}).get("features", {}),
     }
 
+    # Container temporaneo per la schermata di caricamento
     loading_container = st.empty()
 
     with loading_container.container():
         st.info("🕒 Elaborazione query in corso...")
 
-        # Pulsante ANNULLA visibile ESCLUSIVAMENTE mentre i dati sono in caricamento
+        # Pulsante di annullamento: permette di interrompere la query sul server via DELETE
         if st.button("🚫 Annulla la query e torna alla home", key="btn_cancel"):
             try:
                 requests.delete(f"http://127.0.0.1:8000/cancel-query/{query_id}")
@@ -43,7 +53,7 @@ def carica_tutti_i_dati():
             st.session_state.clear()
             st.switch_page("pages/home.py")
 
-        # Chiamata HTTP
+        # Chiamata HTTP POST sincrona al backend FastAPI
         try:
             response = requests.post(
                 f"http://127.0.0.1:8000/AKI/{query_id}", json=payload
@@ -54,30 +64,32 @@ def carica_tutti_i_dati():
                 st.session_state["tutti_i_dati"] = dati if dati else []
                 st.session_state["pagina_corrente"] = 1
                 st.session_state["errore_query"] = None
-                esito =  True
+                esito = True
             else:
                 st.session_state["errore_query"] = (
                     f"Errore dal server ({response.status_code}): {response.text}"
                 )
-                esito =  False
+                esito = False
 
         except requests.exceptions.RequestException as e:
             st.session_state["errore_query"] = (
                 f"Richiesta interrotta o errore di connessione: {e}"
             )
-            esito =  False
+            esito = False
 
+    # Pulisce l'area di caricamento dopo aver ottenuto la risposta
     loading_container.empty()
     return esito
 
 
-# Esecuzione Caricamento (Solo se non abbiamo ancora dati né errori)
+# --- Controller di Caricamento ---
+# Esegue la chiamata al server solo al primo caricamento (quando non ci sono né dati né errori)
 if st.session_state["tutti_i_dati"] is None and st.session_state["errore_query"] is None:
     successo = carica_tutti_i_dati()
     if successo:
         st.rerun()
 
-# 2. Gestione in caso di ERRORE HTTP / Connessione
+# ---  Gestione degli Errori ---
 if st.session_state["errore_query"] is not None:
     st.error(st.session_state["errore_query"])
 
@@ -87,7 +99,7 @@ if st.session_state["errore_query"] is not None:
             st.session_state.clear()
             st.switch_page("pages/home.py")
 
-# 3. Visualizzazione Dati e Paginazione (Se non ci sono errori)
+# ---  Rendering Dati, Tabella Personalizzata e Paginazione ---
 elif st.session_state["tutti_i_dati"] is not None:
 
     if len(st.session_state["tutti_i_dati"]) == 0:
@@ -99,6 +111,7 @@ elif st.session_state["tutti_i_dati"] is not None:
 
         tutti_i_dati = st.session_state["tutti_i_dati"]
 
+        # Calcolo degli indici per lo slicing dei dati (Paginazione lato client)
         totale_righe = len(tutti_i_dati)
         totale_pagine = max(1, (totale_righe + PAGE_SIZE - 1) // PAGE_SIZE)
 
@@ -106,6 +119,7 @@ elif st.session_state["tutti_i_dati"] is not None:
         start_idx = (pagina - 1) * PAGE_SIZE
         end_idx = start_idx + PAGE_SIZE
 
+        # Estrazione del sottoinsieme di dati per la pagina attiva
         dati_pagina = tutti_i_dati[start_idx:end_idx]
 
         df_pagina = pd.DataFrame(dati_pagina)
@@ -114,7 +128,7 @@ elif st.session_state["tutti_i_dati"] is not None:
         num_colonne = len(df_pagina.columns)
         html_table = df_pagina.to_html(classes="fixed-table", index=False)
 
-        # Style CSS
+        # Iniezione di CSS per rendere la tabella scrollabile con header fisso (sticky)
         st.markdown(
             f"""
             <style>
@@ -154,17 +168,19 @@ elif st.session_state["tutti_i_dati"] is not None:
             unsafe_allow_html=True,
         )
 
+        # Rendering della tabella HTML all'interno del container con scroll
         st.markdown(
             f'<div class="table-container">{html_table}</div>',
             unsafe_allow_html=True,
         )
 
+        # Dettagli riassuntivi sulla paginazione corrente
         st.caption(
             f"Mostrati record {start_idx + 1} - {min(end_idx, totale_righe)} di {totale_righe} | "
             f"Pagina {pagina} di {totale_pagine}"
         )
 
-        # Controlli Paginazione
+        # --- Controlli dell'Interfaccia: Paginazione ed Esportazione CSV ---
         col_prev, col_page, col_next, col_csv_all, col_csv_pag, _ = st.columns([1, 2, 1, 1, 1, 3])
 
         with col_prev:
@@ -207,7 +223,7 @@ elif st.session_state["tutti_i_dati"] is not None:
                 mime="text/csv",
             )
 
-    # Pulsante per tornare alla home
+    # Pulsante per resettare lo stato e rientrare alla pagina principale
     st.write("---")
     if st.button("🏠 Torna alla Home Page"):
         st.session_state.clear()
