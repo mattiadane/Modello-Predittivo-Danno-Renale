@@ -98,14 +98,14 @@ cd Modello-Predittivo-Danno-Renale
     ```
 2. **Attivazione dell'ambiente virtuale:**
 
-* **macOS / Linux**: 
-```bash  
-  source .venv/bin/activate 
-  ```
-* **Windows (PowerShell)**:
- ```PoweShell
-    .venv\Scripts\Activate.ps1
- ``` 
+   * **macOS / Linux**: 
+      ```bash  
+        source .venv/bin/activate 
+        ```
+   * **Windows (PowerShell)**:
+      ```PoweShell
+     .venv\Scripts\Activate.ps1
+      ``` 
 3. **Installazione delle librerie:**
 ```bash
 pip install -r requirements.txt
