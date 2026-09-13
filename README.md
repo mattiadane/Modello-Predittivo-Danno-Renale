@@ -6,26 +6,39 @@ Sistema per la predizione dell'**Acute Kidney Injury (AKI)** basato su un approc
 
 ## ⏳ Logica a 3 Finestre Temporali
 
-* **Observation Window:** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata e seleziona da 3 a 6 parametri clinici da monitorare (es. farmaci, parametri vitali, esami di laboratorio).
+* **Observation Window:** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata e seleziona da 3 a 6 parametri clinici da monitorare (es. farmaci, parametri vitali, esami di laboratorio ecc).
 * **Waiting Window:** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
 * **Prediction Window:** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
 
+> 📌 **Vincolo Temporale dei Dati:**  
+> Tutti i parametri e gli eventi clinici estratti e analizzati lungo le finestre rispettano rigorosamente la sequenza cronologica:  
+> $$t_0 < t_1 < t_2 < \dots < t_n < t_{aki}$$  
+> dove $t_0$ rappresenta la prima rilevazione clinica e $t_{aki}$ il momento dell'eventuale classificazione dello stadio AKI.
+
 ---
 
-## ⚙️ Funzionalità Principali
+## ⚙️ Funzionalità Pagina Home
 
 * **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali.
-* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici e riordinarli a proprio piacimento nell'interfaccia.
+* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici e riordinarli nell'interfaccia.
 * **Granularità e Aggregazione:** Per i parametri estratti dalle tabelle cliniche (`chartevents`, `labevents`, `outputevents`), l'utente può definire la granularità temporale dell'evento e la relativa funzione di aggregazione (es. media, massimo, minimo).
+
+---
+
+## ⚙️ Funzionalità Pagina Result
+
+* **Visualizzazione dei risultati tramite paginazione:** Consultazione dei risultati clinici dall'istante $t_0$ del primo parametro al $t_{aki}$ (tempo di insorgenza dello stadio AKI), rispettando i vincoli temporali delle tre finestre.
+* **Interruzione della query:** Pulsante dedicato per interrompere l'esecuzione dell'estrazione dati e tornare alla Home Page.
+* **Esportazione dati in CSV:** Download dell'intero dataset di output o della sola pagina corrente (50 righe).
 
 ---
 
 ## 🛠️ Stack Tecnologico
 
-* **Linguaggio:** Python 3.12.3
+* **Linguaggio:** Python 3.12+
 * **Front-end:** Streamlit 1.59.2
 * **Back-end:** FastAPI 0.139.2
-* **Database:** PostgreSQL
+* **Database:** PostgreSQL (MIMIC-IV v2.2)
 * **Librerie Principali:** SQLAlchemy 2.0.51, Pandas 3.0.3, Pydantic 2.13.4, Requests 2.34.2, Python-dotenv 1.2.2, Uvicorn 0.51.0, Psycopg2-binary 2.9.12
 
 ---
@@ -98,14 +111,14 @@ cd Modello-Predittivo-Danno-Renale
     ```
 2. **Attivazione dell'ambiente virtuale:**
 
-   * **macOS / Linux**: 
-      ```bash  
-        source .venv/bin/activate 
-        ```
+   * **macOS / Linux**:
+     ```bash  
+     source .venv/bin/activate 
+     ```
    * **Windows (PowerShell)**:
-      ```PoweShell
-     .venv\Scripts\Activate.ps1
-      ``` 
+    ```PoweShell
+       .venv\Scripts\Activate.ps1
+    ``` 
 3. **Installazione delle librerie:**
 ```bash
 pip install -r requirements.txt
@@ -119,7 +132,6 @@ DATABASE="Il nome del database che hai dato a mimic"
 USERNAME="Tuo username"
 SCHEMA="Tuo schema"
 PASSWORD="Tua password"
-
 ```
 
 ### 5. Esecuzione dell'applicazione:
