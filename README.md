@@ -112,12 +112,15 @@ pip install -r requirements.txt
 ```
 
 ### 4. Modifica o creazione del file .env:
+```text
 HOST="Tuo server o localhost in caso sei in locale"
 PORT="Tua porta del server o 5432 se sei in locale"
 DATABASE="Il nome del database che hai dato a mimic"
 USERNAME="Tuo username"
 SCHEMA="Tuo schema"
 PASSWORD="Tua password"
+
+```
 
 ### 5. Esecuzione dell'applicazione:
 ```bash
