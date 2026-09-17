@@ -6,9 +6,9 @@ Sistema per la predizione dell'**Acute Kidney Injury (AKI)** basato su un approc
 
 ## ⏳ Logica a 3 Finestre Temporali e Vincoli
 
-* **Observation Window ($W_{obs}$):** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata espressa in ore.
-* **Waiting Window ($W_{wait}$):** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
-* **Prediction Window ($W_{pred}$):** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
+* **Observation Window ($W_{o}$):** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata espressa in ore.
+* **Waiting Window ($W_{wt}$):** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
+* **Prediction Window ($W_{p}$):** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
 
 ### 📌 Vincolo Temporale dei Dati e degli Eventi
 Tutti i parametri e gli eventi clinici estratti devono rispettare rigorosamente le seguenti condizioni temporali:
