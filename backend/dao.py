@@ -199,11 +199,10 @@ def n_tmpv(idx: int, param: ParametroConfig, param_prec: ParametroConfig, ctePre
 
     have_id = param.id is not None
 
-    # Vincolo temporale: la nuova misurazione deve avvenire entro l'Observation Window stabilita
+    time_col = f"{subname}.valid_time" if have_id else f"{subname}.starttime"
     where_fields = [
         f"{subname}.itemid = {param.id}" if have_id else f"{subname}.tipo = '{param.parametro}'",
-        f"{subname}.valid_time BETWEEN f{idx - 1}.t_{idx - 2} AND f{idx - 1}.end_ow" if have_id
-        else f"{subname}.starttime BETWEEN f{idx - 1}.t_{idx - 2} AND f{idx - 1}.end_ow"
+        f"{time_col} > f{idx - 1}.t_{idx - 2} AND {time_col} <= f{idx - 1}.end_ow"
     ]
     group_fields = []
 
@@ -327,13 +326,13 @@ def final_query(diz: dict, ww: int, pw: int) -> str:
     # Query finale: Unisce le finestre di osservazione valide con gli eventi AKI nell'intervallo (end_ow + ww, end_ow + ww + pw]
     query = (
         f"observation_window AS (\n"
-        f" SELECT DISTINCT {field_str}, f{count - 1}.end_ow, f{count - 1}.hadm_id FROM stable_patient sp\n"
+        f" SELECT DISTINCT {field_str}, f{count - 1}.end_ow, sp.stay_id FROM stable_patient sp\n"
         f"{join_str}\n"
         f")\n"
-        f"SELECT {fields_str2}, a.aki AS stage_aki, a.charttime AS t_stage_aki FROM aki a\n"
-        f"INNER JOIN observation_window o ON (o.subject_id = a.subject_id AND a.hadm_id = o.hadm_id AND a.charttime > (o.end_ow + INTERVAL '{ww} hours')"
+        f"SELECT {fields_str2}, a.aki_stage AS stage_aki, a.charttime AS t_stage_aki FROM aki a\n"
+        f"INNER JOIN observation_window o ON (o.stay_id = a.stay_id  AND a.charttime > (o.end_ow + INTERVAL '{ww} hours')"
         f" AND a.charttime <= (o.end_ow + INTERVAL '{ww + pw} hours'))\n"
-        f"ORDER BY {order_str}"
+        f"ORDER BY {order_str},a.charttime"
     )
 
     return query

@@ -1,245 +1,314 @@
--- Creazione della vista materializzata per la stadiazione dell'Acute Kidney Injury (AKI) basata su criteri KDIGO
+-- =============================================================================
+-- CREAZIONE MATERIALIZED VIEW: CALCOLO DEGLI STADI AKI (KDIGO)
+-- =============================================================================
+-- Questa vista calcola lo stadio di Acute Kidney Injury (AKI) in modo dinamico
+-- nel tempo per ogni paziente in ICU, combinando tre criteri KDIGO:
+--   1. Volume dell'Output Urinario (UO)
+--   2. Livelli di Creatinina sierica (Cr) e variazione rispetto al punto piu basso/Baseline
+--   3. Eventi di Dialisi / Terapia Sostitutiva Renale (RRT)
+-- =============================================================================
+
 CREATE MATERIALIZED VIEW aki AS
 
---  Estrae tutti i valori di creatinina per ricovero, includendo lo storico fino a 365 giorni prima
-WITH creatina_paziente AS (
+WITH
+-- -----------------------------------------------------------------------------
+-- CTE 1: WEIGHT_DATA
+-- Recupera il peso corporeo del paziente (in kg), necessario per calcolare
+-- la diuresi oraria ponderata (mL/kg/h).
+-- Cerca il peso primariamente da 'chartevents' (in kg); se assente, attinge da
+-- 'omr' facendone la conversione da libbre (Lbs) a chilogrammi (0.45359237).
+-- -----------------------------------------------------------------------------
+weight_data AS (
     SELECT
-        adm.subject_id,
-        adm.hadm_id,
-        p.gender,
-        p.anchor_age,
-        adm.admittime,
-        l.charttime,
-        l.valuenum AS creatina
-    FROM admissions adm
-    JOIN patients p ON adm.subject_id = p.subject_id
-    JOIN labevents l ON adm.subject_id = l.subject_id
-    WHERE l.itemid = 50912 -- Codice per la Creatinina sierica
-      AND l.valuenum IS NOT NULL
-      AND l.valuenum > 0::DOUBLE PRECISION
-      AND l.charttime >= (adm.admittime - '365 days'::INTERVAL) -- Finestra temporale baseline
-      AND l.charttime <= adm.dischtime
+        ie.stay_id,
+        AVG(
+            CASE
+                -- Peso registrato direttamente in kg
+                WHEN c.valuenum IS NOT NULL AND c.valuenum > 0 THEN c.valuenum
+                -- Peso registrato in libbre (Lbs) convertito in Kg
+                WHEN omr.result_value IS NOT NULL AND omr.result_value::DOUBLE PRECISION > 0
+                    THEN omr.result_value::DOUBLE PRECISION * 0.45359237
+                ELSE NULL
+            END
+        ) AS weight_kg
+    FROM icustays ie
+    LEFT JOIN chartevents c
+        ON ie.stay_id = c.stay_id
+        AND c.itemid IN (226512, 224639) -- ItemID MIMIC per il peso corporeo in kg
+        AND c.valuenum > 0
+    LEFT JOIN omr
+        ON ie.subject_id = omr.subject_id
+        AND omr.result_name = 'Weight (Lbs)'
+    GROUP BY ie.stay_id
 ),
 
---  Calcola i valori minimi di creatinina in diverse finestre temporali pre e intra-ricovero
-aggregati_baseline AS (
+-- -----------------------------------------------------------------------------
+-- CTE 2: UO_ORARIO
+-- Estrae e somma le misurazioni dell'output urinario (mL) aggregate per ora
+-- e per degenza (stay_id), scartando i pazienti senza un peso valido.
+-- -----------------------------------------------------------------------------
+uo_orario AS (
     SELECT
-        creatina_paziente.hadm_id,
-        creatina_paziente.subject_id,
-        creatina_paziente.gender,
-        creatina_paziente.anchor_age,
-        -- Minima creatinina tra 1 anno e 7 giorni prima dell'ammissione
-        MIN(CASE
-            WHEN creatina_paziente.charttime >= (creatina_paziente.admittime - '365 days'::INTERVAL)
-             AND creatina_paziente.charttime < (creatina_paziente.admittime - '7 days'::INTERVAL)
-            THEN creatina_paziente.creatina
-            ELSE NULL::DOUBLE PRECISION
-        END) AS creat_pre_365_7d,
-        -- Minima creatinina nei 7 giorni precedenti l'ammissione
-        MIN(CASE
-            WHEN creatina_paziente.charttime >= (creatina_paziente.admittime - '7 days'::INTERVAL)
-             AND creatina_paziente.charttime < creatina_paziente.admittime
-            THEN creatina_paziente.creatina
-            ELSE NULL::DOUBLE PRECISION
-        END) AS creat_pre_7d,
-        -- Minima creatinina registrata durante il ricovero attuale
-        MIN(CASE
-            WHEN creatina_paziente.charttime >= creatina_paziente.admittime
-            THEN creatina_paziente.creatina
-            ELSE NULL::DOUBLE PRECISION
-        END) AS creat_min_ricovero
-    FROM creatina_paziente
-    GROUP BY creatina_paziente.hadm_id, creatina_paziente.subject_id, creatina_paziente.gender, creatina_paziente.anchor_age
-),
-
---  Stima la creatinina di base (MDRD se mancante) e seleziona il valore di baseline definitivo
-final_baseline AS (
-    SELECT
-        b.hadm_id,
-        b.subject_id,
-        -- Formula MDRD inversa per stimare la creatinina baseline teorica assumendo eGFR = 75 mL/min/1.73m²
-        GREATEST(ROUND((75.0 / (175.0 * POWER(GREATEST(b.anchor_age::INTEGER, 18)::NUMERIC, '-0.203'::NUMERIC) *
-            CASE WHEN b.gender = 'F'::BPCHAR THEN 0.742 ELSE 1.0 END)) ^ ('-1'::INTEGER::NUMERIC / 1.154), 2), 0.1) AS creat_mdrd_stimata,
-        -- Priorità di selezione della baseline: 1) Pre 365-7d, 2) Pre 7d, 3) Minima in ricovero, 4) MDRD stimata
-        COALESCE(b.creat_pre_365_7d, b.creat_pre_7d, b.creat_min_ricovero,
-            GREATEST(ROUND((75.0 / (175.0 * POWER(GREATEST(b.anchor_age::INTEGER, 18)::NUMERIC, '-0.203'::NUMERIC) *
-            CASE WHEN b.gender = 'F'::BPCHAR THEN 0.742 ELSE 1.0 END)) ^ ('-1'::INTEGER::NUMERIC / 1.154), 2), 0.1)::DOUBLE PRECISION) AS baseline_definitiva
-    FROM aggregati_baseline b
-),
-
---  Associa la baseline e calcola il valore minimo (nadir) di creatinina nelle 48 ore precedenti
-aki_creatina_raw AS (
-    SELECT
-        cp.subject_id,
-        cp.hadm_id,
-        cp.admittime,
-        cp.charttime,
-        cp.creatina,
-        fb.baseline_definitiva,
-        MIN(cp.creatina) OVER (PARTITION BY cp.hadm_id ORDER BY cp.charttime RANGE BETWEEN '48:00:00'::INTERVAL PRECEDING AND CURRENT ROW) AS nadir_48h
-    FROM creatina_paziente cp
-    JOIN final_baseline fb ON fb.hadm_id = cp.hadm_id
-),
-
---  Calcola lo stadio AKI secondo la Creatinina (Criteri KDIGO)
-aki_creatina AS (
-    SELECT
-        aki_creatina_raw.subject_id,
-        aki_creatina_raw.hadm_id,
-        aki_creatina_raw.charttime,
-        CASE
-            -- Stage 3: Creatinina >= 3x baseline OPPURE >= 4.0 mg/dL con un incremento acuto >= 0.3 mg/dL
-            WHEN (aki_creatina_raw.creatina / NULLIF(aki_creatina_raw.baseline_definitiva, 0::DOUBLE PRECISION)) >= 3.0::DOUBLE PRECISION
-              OR (aki_creatina_raw.creatina >= 4.0::DOUBLE PRECISION AND (aki_creatina_raw.creatina - aki_creatina_raw.nadir_48h) >= 0.3::DOUBLE PRECISION) THEN 3
-            -- Stage 2: Creatinina tra 2.0x e 2.9x la baseline
-            WHEN (aki_creatina_raw.creatina / NULLIF(aki_creatina_raw.baseline_definitiva, 0::DOUBLE PRECISION)) >= 2.0::DOUBLE PRECISION THEN 2
-            -- Stage 1: Creatinina tra 1.5x e 1.9x la baseline OPPURE aumento >= 0.3 mg/dL nelle 48h
-            WHEN (aki_creatina_raw.creatina / NULLIF(aki_creatina_raw.baseline_definitiva, 0::DOUBLE PRECISION)) >= 1.5::DOUBLE PRECISION
-              OR (aki_creatina_raw.creatina - aki_creatina_raw.nadir_48h) >= 0.3::DOUBLE PRECISION THEN 1
-            ELSE 0
-        END AS stage_creatina
-    FROM aki_creatina_raw
-    WHERE aki_creatina_raw.charttime >= aki_creatina_raw.admittime
-),
-
--- Calcola il peso medio in kg convertendolo da libbre (Lbs)
-peso_pazienti AS (
-    SELECT
-        omr.subject_id,
-        AVG(omr.result_value::DOUBLE PRECISION) * 0.45359237::DOUBLE PRECISION AS peso_kg
-    FROM omr
-    WHERE omr.result_name::TEXT = 'Weight (Lbs)'::TEXT
-      AND omr.result_value::DOUBLE PRECISION > 0::DOUBLE PRECISION
-    GROUP BY omr.subject_id
-),
-
--- Aggrega l'output urinario orario per ricovero
-diuresi_oraria AS (
-    SELECT
-        oe.subject_id,
-        oe.hadm_id,
+        oe.stay_id,
         oe.charttime,
         SUM(oe.value) AS urine_ml,
-        w.peso_kg
+        w.weight_kg
     FROM outputevents oe
-    JOIN peso_pazienti w ON oe.subject_id = w.subject_id
-    WHERE w.peso_kg IS NOT NULL
-      AND w.peso_kg > 0::DOUBLE PRECISION
-      AND (oe.itemid = ANY (ARRAY[226559, 226560])) -- Item ID per la diuresi
-    GROUP BY oe.subject_id, oe.hadm_id, oe.charttime, w.peso_kg
+    JOIN weight_data w ON oe.stay_id = w.stay_id
+    WHERE oe.itemid IN (
+            226559, 226560, 226561, 226563, 226564,
+            226565, 226567, 226557, 226558, 227488, 227489
+          ) -- Tutti gli ItemID MIMIC per la produzione di urina (catetere, nefrostomia, ecc.)
+      AND w.weight_kg > 0
+    GROUP BY oe.stay_id, oe.charttime, w.weight_kg
 ),
 
--- Calcola il volume di urina e le ore di copertura effettive per finestre mobili di 6h, 12h e 24h
-diuresi_con_copertura AS (
+-- -----------------------------------------------------------------------------
+-- CTE 3: UO_WINDOWS
+-- Calcola, per ogni timestamp, la somma progressiva delle urine (mL) e la
+-- durata effettiva della finestra temporale (in ore) per 3 intervalli mobili:
+--   - Ultime 6 ore (w6)
+--   - Ultime 12 ore (w12)
+--   - Ultime 24 ore (w24)
+-- La durata effettiva (hours_Xh) viene calcolata tramite EXTRACT(EPOCH...) per
+-- assicurarsi che la finestra copra davvero l'intervallo di ore richiesto.
+-- -----------------------------------------------------------------------------
+uo_windows AS (
     SELECT
-        diuresi_oraria.subject_id,
-        diuresi_oraria.hadm_id,
-        diuresi_oraria.charttime,
-        diuresi_oraria.peso_kg,
-        SUM(diuresi_oraria.urine_ml) OVER w_6h AS urine_6h,
-        SUM(diuresi_oraria.urine_ml) OVER w_12h AS urine_12h,
-        SUM(diuresi_oraria.urine_ml) OVER w_24h AS urine_24h,
-        DATE_PART('epoch'::TEXT, diuresi_oraria.charttime - MIN(diuresi_oraria.charttime) OVER w_6h) / 3600.0::DOUBLE PRECISION AS ore_coperte_6h,
-        DATE_PART('epoch'::TEXT, diuresi_oraria.charttime - MIN(diuresi_oraria.charttime) OVER w_12h) / 3600.0::DOUBLE PRECISION AS ore_coperte_12h,
-        DATE_PART('epoch'::TEXT, diuresi_oraria.charttime - MIN(diuresi_oraria.charttime) OVER w_24h) / 3600.0::DOUBLE PRECISION AS ore_coperte_24h
-    FROM diuresi_oraria
-    WINDOW w_6h AS (PARTITION BY diuresi_oraria.hadm_id ORDER BY diuresi_oraria.charttime RANGE BETWEEN '06:00:00'::INTERVAL PRECEDING AND CURRENT ROW),
-           w_12h AS (PARTITION BY diuresi_oraria.hadm_id ORDER BY diuresi_oraria.charttime RANGE BETWEEN '12:00:00'::INTERVAL PRECEDING AND CURRENT ROW),
-           w_24h AS (PARTITION BY diuresi_oraria.hadm_id ORDER BY diuresi_oraria.charttime RANGE BETWEEN '24:00:00'::INTERVAL PRECEDING AND CURRENT ROW)
+        u.stay_id,
+        u.charttime,
+        u.weight_kg,
+        -- Volumi cumulativi nelle finestre temporali
+        SUM(u.urine_ml) OVER w6  AS uo_6h,
+        SUM(u.urine_ml) OVER w12 AS uo_12h,
+        SUM(u.urine_ml) OVER w24 AS uo_24h,
+        -- Calcolo delle ore effettive di copertura della finestra temporale
+        EXTRACT(EPOCH FROM (u.charttime - MIN(u.charttime) OVER w6)) / 3600.0  AS hours_6h,
+        EXTRACT(EPOCH FROM (u.charttime - MIN(u.charttime) OVER w12)) / 3600.0 AS hours_12h,
+        EXTRACT(EPOCH FROM (u.charttime - MIN(u.charttime) OVER w24)) / 3600.0 AS hours_24h
+    FROM uo_orario u
+    WINDOW
+        w6  AS (PARTITION BY u.stay_id ORDER BY u.charttime RANGE BETWEEN '06:00:00'::INTERVAL PRECEDING AND CURRENT ROW),
+        w12 AS (PARTITION BY u.stay_id ORDER BY u.charttime RANGE BETWEEN '12:00:00'::INTERVAL PRECEDING AND CURRENT ROW),
+        w24 AS (PARTITION BY u.stay_id ORDER BY u.charttime RANGE BETWEEN '24:00:00'::INTERVAL PRECEDING AND CURRENT ROW)
 ),
 
---  Calcola lo stadio AKI secondo l'output urinario/diuresi normalized per kg/ora (Criteri KDIGO)
-aki_diuresi AS (
+-- -----------------------------------------------------------------------------
+-- CTE 4: KDIGO_UO
+-- Assegna lo stadio AKI (0, 1, 2 o 3) basandosi sui volumi urinari (mL/kg/h):
+--   - Stadio 3: < 0.3 mL/kg/h per >= 24 ore OPPURE Anuria (0 mL) per >= 12 ore
+--   - Stadio 2: < 0.5 mL/kg/h per >= 12 ore
+--   - Stadio 1: < 0.5 mL/kg/h per >= 6 ore
+-- -----------------------------------------------------------------------------
+kdigo_uo AS (
     SELECT
-        diuresi_con_copertura.subject_id,
-        diuresi_con_copertura.hadm_id,
-        diuresi_con_copertura.charttime,
+        uw.stay_id,
+        uw.charttime,
         CASE
-            -- Stage 3: < 0.3 mL/kg/h per >= 24h OPPURE anuria per >= 12h
-            WHEN diuresi_con_copertura.ore_coperte_24h >= 24::DOUBLE PRECISION
-             AND (diuresi_con_copertura.urine_24h / NULLIF(diuresi_con_copertura.peso_kg * 24.0::DOUBLE PRECISION, 0::DOUBLE PRECISION)) < 0.3::DOUBLE PRECISION THEN 3
-            WHEN diuresi_con_copertura.ore_coperte_12h >= 12::DOUBLE PRECISION
-             AND diuresi_con_copertura.urine_12h = 0::DOUBLE PRECISION THEN 3
-            -- Stage 2: < 0.5 mL/kg/h per >= 12h
-            WHEN diuresi_con_copertura.ore_coperte_12h >= 12::DOUBLE PRECISION
-             AND (diuresi_con_copertura.urine_12h / NULLIF(diuresi_con_copertura.peso_kg * 12.0::DOUBLE PRECISION, 0::DOUBLE PRECISION)) < 0.5::DOUBLE PRECISION THEN 2
-            -- Stage 1: < 0.5 mL/kg/h per >= 6h
-            WHEN diuresi_con_copertura.ore_coperte_6h >= 6::DOUBLE PRECISION
-             AND (diuresi_con_copertura.urine_6h / NULLIF(diuresi_con_copertura.peso_kg * 6.0::DOUBLE PRECISION, 0::DOUBLE PRECISION)) < 0.5::DOUBLE PRECISION THEN 1
+            WHEN uw.hours_24h >= 24 AND (uw.uo_24h / (uw.weight_kg * 24.0)) < 0.3 THEN 3
+            WHEN uw.hours_12h >= 12 AND uw.uo_12h = 0 THEN 3
+            WHEN uw.hours_12h >= 12 AND (uw.uo_12h / (uw.weight_kg * 12.0)) < 0.5 THEN 2
+            WHEN uw.hours_6h >= 6   AND (uw.uo_6h / (uw.weight_kg * 6.0)) < 0.5   THEN 1
             ELSE 0
-        END AS stage_diuresi
-    FROM diuresi_con_copertura
+        END AS aki_stage_uo
+    FROM uo_windows uw
 ),
 
---  Unisce tutti i timestamp unici (sia di creatinina che di diuresi) per sincronizzarli
-istanti AS (
-    SELECT aki_creatina.hadm_id, aki_creatina.subject_id, aki_creatina.charttime FROM aki_creatina
+-- -----------------------------------------------------------------------------
+-- CTE 5: RRT_EVENTS
+-- Identifica se il paziente è sottoposto a Dialisi / Renal Replacement Therapy
+-- durante la degenza. Qualsiasi evento RRT porta automaticamente lo stadio AKI a 3.
+-- -----------------------------------------------------------------------------
+rrt_events AS (
+    SELECT DISTINCT
+        ie.stay_id,
+        ce.charttime
+    FROM icustays ie
+    JOIN chartevents ce
+        ON ie.subject_id = ce.subject_id
+        AND ce.charttime >= ie.intime
+        AND ce.charttime <= ie.outtime
+    WHERE ce.itemid IN (
+            224146, 224149, 224150, 224151, 225802,
+            225803, 225805, 225809, 225955, 225976, 225977
+          ) -- ItemID relativi a procedure di emodialisi / CRRT
+      AND ce.valuenum IS NOT NULL
+      AND ce.valuenum > 0
+),
+
+-- -----------------------------------------------------------------------------
+-- CTE 6: CR_PAZIENTE
+-- Estrae tutte le misurazioni di laboratorio della Creatinina sierica (Item 50912).
+-- Estende la ricerca fino a 365 giorni prima dell'ingresso in ICU per poter
+-- calcolare una baseline storica accurata.
+-- -----------------------------------------------------------------------------
+cr_paziente AS (
+    SELECT
+        ie.stay_id,
+        ie.hadm_id,
+        ie.subject_id,
+        ie.intime,
+        l.charttime,
+        l.valuenum AS creatina
+    FROM icustays ie
+    JOIN labevents l ON ie.subject_id = l.subject_id
+    WHERE l.itemid = 50912 -- Creatinina sierica
+      AND l.valuenum IS NOT NULL
+      AND l.valuenum > 0
+      AND l.charttime >= (ie.intime - INTERVAL '365 days')
+      AND l.charttime <= ie.outtime
+),
+
+-- -----------------------------------------------------------------------------
+-- CTE 7: CR_BASELINE
+-- Determina il valore di riferimento (Baseline) della creatinina per ogni ricovero.
+-- Applica una rigida gerarchia clinica tramite COALESCE:
+--   1. Valore minimo tra 365 e 7 giorni prima dell'ingresso in ICU (preferito)
+--   2. In mancanza, valore minimo nei 7 giorni prima dell'ingresso
+--   3. In mancanza, il primo valore disponibile dopo l'ingresso in ICU
+-- -----------------------------------------------------------------------------
+cr_baseline AS (
+    SELECT
+        cp.stay_id,
+        COALESCE(
+            -- Priorità 1: Storico da 1 anno a 7 giorni prima
+            MIN(CASE WHEN cp.charttime >= (cp.intime - INTERVAL '365 days') AND cp.charttime < (cp.intime - INTERVAL '7 days') THEN cp.creatina END),
+            -- Priorità 2: Pre-ICU recente (ultimi 7 giorni)
+            MIN(CASE WHEN cp.charttime >= (cp.intime - INTERVAL '7 days')   AND cp.charttime < cp.intime THEN cp.creatina END),
+            -- Priorità 3: Valore post-ingresso in ICU
+            MIN(CASE WHEN cp.charttime >= cp.intime THEN cp.creatina END)
+        ) AS baseline_creatina
+    FROM cr_paziente cp
+    GROUP BY cp.stay_id
+),
+
+-- -----------------------------------------------------------------------------
+-- CTE 8: KDIGO_CR
+-- Stadiazione AKI basata sulle variazioni di Creatinina:
+--   - Stadio 3: Cr >= 3.0x Baseline OR (Cr >= 4.0 mg/dL con aumento >= 0.3 rispetto al Nadir 48h)
+--   - Stadio 2: Cr >= 2.0x Baseline
+--   - Stadio 1: Cr >= 1.5x Baseline OR incremento assoluto >= 0.3 mg/dL rispetto al Nadir delle ultime 48h
+-- -----------------------------------------------------------------------------
+kdigo_cr AS (
+    SELECT
+        cp.stay_id,
+        cp.charttime,
+        cp.creatina,
+        cb.baseline_creatina,
+        CASE
+            -- Stadio 3
+            WHEN (cp.creatina / NULLIF(cb.baseline_creatina, 0)) >= 3.0
+               OR (cp.creatina >= 4.0 AND (cp.creatina - MIN(cp.creatina) OVER w48) >= 0.3) THEN 3
+            -- Stadio 2
+            WHEN (cp.creatina / NULLIF(cb.baseline_creatina, 0)) >= 2.0 THEN 2
+            -- Stadio 1
+            WHEN (cp.creatina / NULLIF(cb.baseline_creatina, 0)) >= 1.5
+               OR (cp.creatina - MIN(cp.creatina) OVER w48) >= 0.3 THEN 1
+            ELSE 0
+        END AS aki_stage_cr
+    FROM cr_paziente cp
+    JOIN cr_baseline cb ON cp.stay_id = cb.stay_id
+    WHERE cp.charttime >= cp.intime
+    -- Finestra mobile di 48 ore per il calcolo del Nadir (valore più basso)
+    WINDOW w48 AS (PARTITION BY cp.stay_id ORDER BY cp.charttime RANGE BETWEEN '48:00:00'::INTERVAL PRECEDING AND CURRENT ROW)
+),
+
+-- -----------------------------------------------------------------------------
+-- CTE 9: ALL_TIMESTAMPS
+-- Crea la griglia temporale unificata che raccoglie tutti i timestamp in cui
+-- è stata eseguita ALMENO UNA misurazione (Cr, UO o inizio RRT).
+-- -----------------------------------------------------------------------------
+all_timestamps AS (
+    SELECT stay_id, charttime FROM kdigo_cr
     UNION
-    SELECT aki_diuresi.hadm_id, aki_diuresi.subject_id, aki_diuresi.charttime FROM aki_diuresi
+    SELECT stay_id, charttime FROM kdigo_uo
+    UNION
+    SELECT stay_id, charttime FROM rrt_events
 ),
 
--- Deduplica le misurazioni di creatinina sullo stesso timestamp mantenendo lo stadio massimo
-aki_creatina_dedup AS (
-    SELECT aki_creatina.hadm_id, aki_creatina.charttime, MAX(aki_creatina.stage_creatina) AS stage_creatina
-    FROM aki_creatina
-    GROUP BY aki_creatina.hadm_id, aki_creatina.charttime
-),
-
--- Deduplica le misurazioni di diuresi sullo stesso timestamp mantenendo lo stadio massimo
-aki_diuresi_dedup AS (
-    SELECT aki_diuresi.hadm_id, aki_diuresi.charttime, MAX(aki_diuresi.stage_diuresi) AS stage_diuresi
-    FROM aki_diuresi
-    GROUP BY aki_diuresi.hadm_id, aki_diuresi.charttime
-),
-
---  Applica il Forward Fill per la Creatinina (mantiene l'ultimo stadio noto per i timestamp successivi)
-con_stage_creat AS (
+-- -----------------------------------------------------------------------------
+-- CTE 10: FF_CR (Forward-Fill per Creatinina)
+-- Propaga l'ultimo stadio AKI calcolato per la Creatinina nei timestamp
+-- intermedi in cui la Creatinina non è stata misurata (es. durante un log UO).
+-- Utilizza la tecnica del "Grouping by COUNT" per la propagazione del valore.
+-- -----------------------------------------------------------------------------
+ff_cr AS (
     SELECT
-        sub.hadm_id,
-        sub.subject_id,
-        sub.charttime,
-        MAX(sub.stage_creatina_raw) OVER (PARTITION BY sub.hadm_id, sub.grp) AS stage_creatina
+        t.stay_id,
+        t.charttime,
+        MAX(t.aki_stage_cr) OVER (PARTITION BY t.stay_id, t.grp_cr) AS aki_stage_cr
     FROM (
         SELECT
-            i.hadm_id,
-            i.subject_id,
-            i.charttime,
-            ac.stage_creatina AS stage_creatina_raw,
-            COUNT(ac.stage_creatina) OVER (PARTITION BY i.hadm_id ORDER BY i.charttime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS grp
-        FROM istanti i
-        LEFT JOIN aki_creatina_dedup ac ON ac.hadm_id = i.hadm_id AND ac.charttime = i.charttime
-    ) sub
+            ts.stay_id,
+            ts.charttime,
+            c.aki_stage_cr,
+            -- Crea un ID di gruppo che si incrementa ogni volta che incontriamo un nuovo valore non nullo
+            COUNT(c.aki_stage_cr) OVER (PARTITION BY ts.stay_id ORDER BY ts.charttime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS grp_cr
+        FROM all_timestamps ts
+        LEFT JOIN (
+            SELECT stay_id, charttime, MAX(aki_stage_cr) AS aki_stage_cr
+            FROM kdigo_cr
+            GROUP BY stay_id, charttime
+        ) c ON ts.stay_id = c.stay_id AND ts.charttime = c.charttime
+    ) t
 ),
 
---  Applica il Forward Fill per la Diuresi (mantiene l'ultimo stadio noto per i timestamp successivi)
-con_stage_diuresi AS (
+-- -----------------------------------------------------------------------------
+-- CTE 11: FF_UO (Forward-Fill per Output Urinario)
+-- Analogamente alla CTE 10, propaga l'ultimo stadio AKI calcolato dall'Output
+-- Urinario lungo tutta la Timeline dei timestamp unificati.
+-- -----------------------------------------------------------------------------
+ff_uo AS (
     SELECT
-        sub.hadm_id,
-        sub.subject_id,
-        sub.charttime,
-        MAX(sub.stage_diuresi_raw) OVER (PARTITION BY sub.hadm_id, sub.grp) AS stage_diuresi
+        t.stay_id,
+        t.charttime,
+        MAX(t.aki_stage_uo) OVER (PARTITION BY t.stay_id, t.grp_uo) AS aki_stage_uo
     FROM (
         SELECT
-            i.hadm_id,
-            i.subject_id,
-            i.charttime,
-            ad.stage_diuresi AS stage_diuresi_raw,
-            COUNT(ad.stage_diuresi) OVER (PARTITION BY i.hadm_id ORDER BY i.charttime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS grp
-        FROM istanti i
-        LEFT JOIN aki_diuresi_dedup ad ON ad.hadm_id = i.hadm_id AND ad.charttime = i.charttime
-    ) sub
+            ts.stay_id,
+            ts.charttime,
+            u.aki_stage_uo,
+            COUNT(u.aki_stage_uo) OVER (PARTITION BY ts.stay_id ORDER BY ts.charttime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS grp_uo
+        FROM all_timestamps ts
+        LEFT JOIN (
+            SELECT stay_id, charttime, MAX(aki_stage_uo) AS aki_stage_uo
+            FROM kdigo_uo
+            GROUP BY stay_id, charttime
+        ) u ON ts.stay_id = u.stay_id AND ts.charttime = u.charttime
+    ) t
 )
 
---  Selezione finale: determina lo stadio AKI complessivo prendendo il peggiore (GREATEST) tra Creatinina e Diuresi
+-- =============================================================================
+-- SELEZIONE FINALE
+-- Combina i risultati propagati di Creatinina (ff_cr), Output Urinario (ff_uo)
+-- e la presenza di RRT.
+-- Lo stadio AKI finale (aki_stage) per ciascun timestamp è il valore MASSIMO
+-- (GREATEST) tra i 3 criteri individuali.
+-- =============================================================================
 SELECT
-    c.subject_id,
-    c.hadm_id,
-    c.charttime,
-    GREATEST(COALESCE(c.stage_creatina, 0), COALESCE(d.stage_diuresi, 0)) AS aki
-FROM con_stage_creat c
-JOIN con_stage_diuresi d ON c.hadm_id = d.hadm_id AND c.charttime = d.charttime
-ORDER BY c.subject_id, c.hadm_id, c.charttime;
+    ie.subject_id,
+    ie.hadm_id,
+    ie.stay_id,
+    ts.charttime,
+    COALESCE(cr.aki_stage_cr, 0) AS aki_stage_cr,
+    COALESCE(uo.aki_stage_uo, 0) AS aki_stage_uo,
+    CASE
+        WHEN rrt.stay_id IS NOT NULL THEN 1
+        ELSE 0
+    END AS aki_stage_rrt,
+    -- Stadio KDIGO complessivo: il peggiore (massimo) raggiunto in quel momento
+    GREATEST(
+        COALESCE(cr.aki_stage_cr, 0),
+        COALESCE(uo.aki_stage_uo, 0),
+        CASE WHEN rrt.stay_id IS NOT NULL THEN 3 ELSE 0 END
+    ) AS aki_stage
+FROM all_timestamps ts
+JOIN icustays ie ON ts.stay_id = ie.stay_id
+LEFT JOIN ff_cr cr  ON ts.stay_id = cr.stay_id AND ts.charttime = cr.charttime
+LEFT JOIN ff_uo uo  ON ts.stay_id = uo.stay_id AND ts.charttime = uo.charttime
+LEFT JOIN rrt_events rrt ON ts.stay_id = rrt.stay_id AND ts.charttime >= rrt.charttime
+ORDER BY ie.subject_id, ie.hadm_id, ie.stay_id, ts.charttime;
 
--- Creazione dell'indice composito per ottimizzare le ricerche temporali su paziente e ricovero
-CREATE INDEX idx_aki
-    ON aki (subject_id, hadm_id, charttime);
+-- Indice di ottimizzazione per interrogazioni veloci basate sui timestamp del paziente
+CREATE INDEX idx_aki_official
+    ON aki (subject_id, hadm_id, stay_id, charttime);
