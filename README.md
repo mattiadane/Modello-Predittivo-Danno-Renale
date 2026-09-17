@@ -19,11 +19,11 @@ Tutti i parametri e gli eventi clinici estratti devono rispettare rigorosamente 
 
 2. **Inclusione nell'Observation Window:**
    Tutti gli eventi selezionati $t_i$ (da $t_0$ a $t_n$) devono rientrare interamente all'interno della finestra di osservazione stabilita dall'utente:
-   $$t_0 \ge t_{inizio\_osservazione} \quad \text{e} \quad t_n \le t_0 + W_{obs}$$
+   $$t_0 \ge t_{inizio\_osservazione} \quad \text{e} \quad t_n \le t_0 + W_{o}$$
 
 3. **Posizionamento dell'Evento AKI ($t_{aki}$):**
    L'eventuale insorgenza dell'AKI ($t_{aki}$) deve avvenire strettamente all'interno della **Prediction Window**, ovvero dopo il completamento della finestra di osservazione e del tempo di attesa:
-   $$t_n + W_{wait} < t_{aki} \le t_n + W_{wait} + W_{pred}$$
+   $$t_n + W_{w} < t_{aki} \le t_n + W_{w} + W_{p}$$
 
 ---
 
