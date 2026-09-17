@@ -42,7 +42,7 @@ L'utente può selezionare da 3 a 6 parametri clinici provenienti dalle different
 
 ## ⚙️ Funzionalità Pagina Home
 
-* **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali ($W_{obs}$, $W_{wait}$, $W_{pred}$).
+* **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali ($W_{o}$, $W_{w}$, $W_{p}$).
 * **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici tra le categorie disponibili e riordinarli nell'interfaccia.
 * **Granularità e Aggregazione:** Per i parametri estratti dalle tabelle cliniche (`chartevents`, `labevents`, `outputevents`), l'utente può definire la granularità temporale dell'evento e la relativa funzione di aggregazione (es. media, massimo, minimo).
 
