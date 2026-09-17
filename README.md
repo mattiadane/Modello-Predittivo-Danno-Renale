@@ -4,23 +4,46 @@ Sistema per la predizione dell'**Acute Kidney Injury (AKI)** basato su un approc
 
 ---
 
-## ⏳ Logica a 3 Finestre Temporali
+## ⏳ Logica a 3 Finestre Temporali e Vincoli
 
-* **Observation Window:** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata e seleziona da 3 a 6 parametri clinici da monitorare (es. farmaci, parametri vitali, esami di laboratorio ecc).
-* **Waiting Window:** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
-* **Prediction Window:** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
+* **Observation Window ($W_{obs}$):** Fase di osservazione dei pazienti stabili (età compresa tra 18 e 90 anni, privi di AKI preesistente). L'utente sceglie la durata espressa in ore.
+* **Waiting Window ($W_{wait}$):** Intervallo di attesa impostabile dall'utente (da 0 a N ore) tra la finestra di osservazione e quella di predizione.
+* **Prediction Window ($W_{pred}$):** Finestra temporale in cui viene assegnato alla storia clinica del paziente lo stadio di avanzamento dell'AKI secondo le normative **KDIGO** (valore da **0** a **3**, dove 0 indica assenza di AKI e 3 indica lo stadio più avanzato).
 
-> 📌 **Vincolo Temporale dei Dati:**  
-> Tutti i parametri e gli eventi clinici estratti e analizzati lungo le finestre rispettano rigorosamente la sequenza cronologica:  
-> $$t_0 < t_1 < t_2 < \dots < t_n < t_{aki}$$  
-> dove $t_0$ rappresenta la prima rilevazione clinica e $t_{aki}$ il momento dell'eventuale classificazione dello stadio AKI.
+### 📌 Vincolo Temporale dei Dati e degli Eventi
+Tutti i parametri e gli eventi clinici estratti devono rispettare rigorosamente le seguenti condizioni temporali:
+
+1. **Sequenza Cronologica dei Parametri:**
+   $$t_0 < t_1 < t_2 < \dots < t_n$$
+   I parametri selezionati dall'utente (da 3 a 6) devono verificarsi in stretta sequenza cronologica.
+
+2. **Inclusione nell'Observation Window:**
+   Tutti gli eventi selezionati $t_i$ (da $t_0$ a $t_n$) devono rientrare interamente all'interno della finestra di osservazione stabilita dall'utente:
+   $$t_0 \ge t_{inizio\_osservazione} \quad \text{e} \quad t_n \le t_0 + W_{obs}$$
+
+3. **Posizionamento dell'Evento AKI ($t_{aki}$):**
+   L'eventuale insorgenza dell'AKI ($t_{aki}$) deve avvenire strettamente all'interno della **Prediction Window**, ovvero dopo il completamento della finestra di osservazione e del tempo di attesa:
+   $$t_n + W_{wait} < t_{aki} \le t_n + W_{wait} + W_{pred}$$
+
+---
+
+## 📊 Parametri Clinici Monitorati
+
+L'utente può selezionare da 3 a 6 parametri clinici provenienti dalle differenti tabelle del database MIMIC-IV. L'estrazione e la selezione dei parametri avvengono secondo i seguenti criteri:
+
+* **Farmaci (`prescriptions`):** Estratti da una lista predefinita assegnata specifica per l'analisi.
+* **Input Events (`inputevents`):** Tutti gli eventi presenti nella tabella `inputevents`, filtrati per escludere i farmaci già conteggiati.
+* **Output Events (`outputevents`):** Tutti gli eventi registrati nella tabella `outputevents`.
+* **Procedure Events (`procedureevents`):** Tutte le procedure cliniche registrate nella tabella `procedureevents`.
+* **Lab Events (`labevents`):** Selezionati i **primi 200 eventi con il maggior numero di righe/registrazioni** all'interno della tabella `labevents`.
+* **Chart Events (`chartevents`):** Selezionati i **primi 200 eventi con il maggior numero di righe/registrazioni** all'interno della tabella `chartevents`.
 
 ---
 
 ## ⚙️ Funzionalità Pagina Home
 
-* **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali.
-* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici e riordinarli nell'interfaccia.
+* **Configurazione Finestre:** Selezione della dimensione personalizzata (in ore) per ciascuna delle tre finestre temporali ($W_{obs}$, $W_{wait}$, $W_{pred}$).
+* **Selezione Parametri:** Possibilità di scegliere da 3 a 6 parametri clinici tra le categorie disponibili e riordinarli nell'interfaccia.
 * **Granularità e Aggregazione:** Per i parametri estratti dalle tabelle cliniche (`chartevents`, `labevents`, `outputevents`), l'utente può definire la granularità temporale dell'evento e la relativa funzione di aggregazione (es. media, massimo, minimo).
 
 ---
@@ -79,8 +102,8 @@ Modello-Predittivo-Danno-Renale/
 ├── main.py                   # Script di orchestrazione / avvio generale
 ├── myproject.toml            # Configurazione del progetto
 └── README.md                 # Documentazione del progetto
-```
 
+```
 ---
 
 ## 🚀 Guida all'Avvio
