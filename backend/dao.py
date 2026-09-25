@@ -336,7 +336,7 @@ def final_query(diz: dict, ww: int, pw: int) -> str:
         f" SELECT DISTINCT {field_str}, f{count - 1}.end_ow, sp.stay_id FROM stable_patient sp\n"
         f"{join_str}\n"
         f")\n"
-        f"SELECT {fields_str2}, a.aki_stage AS stage_aki, a.charttime AS t_stage_aki FROM aki a\n"
+        f"SELECT DISTINCT {fields_str2}, a.aki_stage AS stage_aki, a.charttime AS t_stage_aki FROM aki a\n"
         f"INNER JOIN observation_window o ON (o.stay_id = a.stay_id  AND a.charttime > (o.end_ow + INTERVAL '{ww} hours')"
         f" AND a.charttime <= (o.end_ow + INTERVAL '{ww + pw} hours'))\n"
         f"ORDER BY {order_str},a.charttime"
