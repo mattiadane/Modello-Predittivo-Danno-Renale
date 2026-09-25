@@ -144,14 +144,13 @@ def first_tmpv(first_param: ParametroConfig, ow: int) -> dict:
 
     # Assegnazione eventuale etichetta/descrizione al parametro
     if config["label"]:
-        is_drug = config['label'] == "drug"
-        label_alias = first_param.parametro if is_drug else config["label"]
-
+        if config['label'] == "drug" :
+            label_alias = first_param.parametro
+        else :
+            label_alias = config["label"] + "_1"
         param_as.append(label_alias)
         select_fields.append(
-            f"{config['label']} AS {sql_alias(first_param.parametro)}"
-            if is_drug
-            else config["label"]
+            f"{config['label']} AS {sql_alias(label_alias)}"
         )
         group_fields.append(config["label"])
 
@@ -250,12 +249,14 @@ def n_tmpv(idx: int, param: ParametroConfig, param_prec: ParametroConfig, ctePre
             where_fields.append(f"{subname}.starttime IS NOT NULL")
 
     if config["label"]:
-        is_drug = config['label'] == "drug"
-        label_alias = param.parametro if is_drug else config["label"]
+        if config['label'] == "drug":
+            label_alias = param.parametro
+        else :
+            label_alias = config["label"] + f"_{idx}"
 
         param_as.append(f"{label_alias}")
         select_fields.append(
-            f"{subname}.{config['label']} AS {sql_alias(param.parametro)}" if is_drug else f"{subname}.{config['label']}"
+            f"{subname}.{config['label']} AS {sql_alias(label_alias)}"
         )
         group_fields.append(f"{subname}.{config['label']}")
 
@@ -316,12 +317,18 @@ def final_query(diz: dict, ww: int, pw: int) -> str:
             f" INNER JOIN {key} f{count} ON sp.stay_id = f{count}.stay_id {f'AND {join_strs}' if count > 1 else ''}")
         count += 1
 
+
+
+
+
     field_str = ", ".join(select_fields)
     order_str = ", ".join(order_fields)
     join_str = "\n".join(join_fields)
 
     # Sostituisce i prefissi delle tabelle con l'alias della vista finale 'o'
     fields_str2 = re.sub(r"\b(f\d+|sp)\.", "o.", field_str)
+
+
 
     # Query finale: Unisce le finestre di osservazione valide con gli eventi AKI nell'intervallo (end_ow + ww, end_ow + ww + pw]
     query = (
